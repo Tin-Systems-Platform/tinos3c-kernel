@@ -25,4 +25,6 @@ int strcmp(const char* s1, const char* s2);
 char getchar();
 void print_int(int num);
 
+void print_hex(uint64_t value);
+void print_uint64(uint64_t value);
 #endif

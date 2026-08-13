@@ -172,3 +172,37 @@ void print_int(int num) {
         print(c);
     }
 }
+
+void print_hex(uint64_t value)
+{
+    const char* hex = "0123456789ABCDEF";
+
+    print("0x");
+
+    for (int i = 15; i >= 0; i--)
+    {
+        putchar(hex[(value >> (i * 4)) & 0xF]);
+    }
+}
+
+void print_uint64(uint64_t value)
+{
+    char buffer[21];
+    int i = 20;
+
+    buffer[i] = '\0';
+
+    if (value == 0)
+    {
+        print("0");
+        return;
+    }
+
+    while (value > 0)
+    {
+        buffer[--i] = '0' + (value % 10);
+        value /= 10;
+    }
+
+    print(&buffer[i]);
+}
