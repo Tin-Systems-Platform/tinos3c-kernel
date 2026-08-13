@@ -1,15 +1,9 @@
-# os-template
-Template for x86 GRUB-based kernels
+# Tinos3c kernel
+This repository only holds the main kernel development effort for Tinos3c.
 
-## Setup
-- Clone this repo.
-```
-git clone https://github.com/9xbt/os-template.git
-cd os-template
-```
-- Change the GRUB config in `boot/grub.cfg` to your liking.
-
-- Run the kernel.
-```
-make run
-```
+You will need the following to compile this:
+* Make
+* binutils
+* clang
+* nasm
+* Grub tooling right now for this
