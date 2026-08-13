@@ -5,7 +5,7 @@
 - [ ] Possible C17 support
 
 ## Memory Management
-- [ ] Physical Memory Manager (PMM)
+- [X] Physical Memory Manager (PMM)
 - [ ] Virtual Memory Manager (VMM)
 - [ ] Kernel heap
 - [ ] `kmalloc` / `kfree`
