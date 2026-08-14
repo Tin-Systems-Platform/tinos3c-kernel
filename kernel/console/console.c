@@ -5,6 +5,7 @@ void console() {
     char buffer[128];
     int pos = 0;
 
+    print("This console is the Tinos3c kernel Debug Console.\n");
     print(">");
 
     while (1) {
@@ -33,6 +34,7 @@ void console() {
                 print("\n");
             }
 
+            scroll_screen();
             print(">");
             pos = 0;
         } else if (pos < sizeof(buffer) - 1) {

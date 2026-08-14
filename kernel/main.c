@@ -4,6 +4,7 @@
 #include <idt/idt.h>
 #include <pic/pic.h>
 #include <mm/pmm.h>
+#include <mm/vmm.h>
 
 #include <console/console.h>
 
@@ -74,6 +75,8 @@ void _main(struct multiboot_info_t *mboot_info, uint32_t mboot_magic) {
     print("Usable memory: ");
     print_uint64(total_memory / (1024 * 1024));
     print(" MB\n");
-    
+
+    vmm_init();
+
     console();
 }
