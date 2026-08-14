@@ -45,13 +45,13 @@ static int page_used(uint64_t page)
  */
 void pmm_init(void)
 {
-    print("Initializing Physical Memory Manager...\n");
+    print("[PMM] Initializing Physical Memory Manager...\n");
     for (uint64_t i = 0; i < BITMAP_SIZE; i++)
         bitmap[i] = 0xFF;
 
     total_pages = MAX_PAGES;
     free_pages = 0;
-    print("Physical Memory Manager initialized.\n");
+    print("[PMM] Physical Memory Manager initialized.\n");
 }
 
 

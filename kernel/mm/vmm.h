@@ -9,4 +9,12 @@
 
 void vmm_init(void);
 
+/**
+ * @brief The Paging logic.
+ * @author randomusert
+ * @date 2026-08-14
+ * 
+ */
+void paging_init(void);
+
 #endif
