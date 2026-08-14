@@ -7,4 +7,6 @@
 * This file contains the definitions and declarations for the virtual memory management (VMM) subsystem.
 */
 
+void vmm_init(void);
+
 #endif
