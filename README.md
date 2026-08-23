@@ -27,3 +27,9 @@ This repository follows the global Tin Systems Platform contributing guidelines.
 ## License
 
 Tinos3c is licensed under the [TINOS License v1.2](LICENSE).
+
+## Credits
+This project wouldn't have been posible without these projects or People.
+* Tinos2c by Randomusert (IDT, GDT, keyboard driver, interrupts, and more behind the scenes).
+* Codex for some methods in stdlib.c and impl for VMM.
+* OSDev wiki for me able to understand these concepts.
