@@ -6,7 +6,7 @@
 
 ## Memory Management
 - [X] Physical Memory Manager (PMM)
-- [ ] Virtual Memory Manager (VMM)
+- [X] Virtual Memory Manager (VMM)
 - [ ] Kernel heap
 - [ ] `kmalloc` / `kfree`
 - [ ] Memory protection
