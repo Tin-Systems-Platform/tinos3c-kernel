@@ -2,10 +2,15 @@
 
 #include <pic/pic.h>
 #include <drivers/keyboard/kb.h>
+#include <mm/vmm.h>
 
 
 // Common ISR handler
 void isr_handler(struct regs  *r) {
+    if (r->int_no == 14) {
+        vmm_page_fault_handler();
+    }
+
     if (r->int_no == 33) {
         uint8_t scancode = inb(0x60); 
         if (!(scancode & 0x80))

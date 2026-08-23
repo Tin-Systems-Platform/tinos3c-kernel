@@ -12,7 +12,15 @@ isr%1:
     jmp isr_common_stub
 %endmacro
 
+%macro ISR_ERRCODE 1
+global isr%1
+isr%1:
+    push byte %1
+    jmp isr_common_stub
+%endmacro
 
+
+ISR_ERRCODE 14
 ISR_NOERRCODE 32
 ISR_NOERRCODE 33
 

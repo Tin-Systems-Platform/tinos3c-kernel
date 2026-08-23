@@ -3,6 +3,7 @@
 
 extern void isr0();
 extern void isr1();
+extern void isr14();
 
 idt_entry_t idt[256] __attribute__((aligned(16)));
 idt_ptr_t idt_p;
@@ -23,6 +24,7 @@ void init_idt() {
     idt_p.limit = (sizeof(idt_entry_t) * 256) - 1;
     idt_p.base  = (uint32_t)&idt;
     memset(&idt, 0, sizeof(idt_entry_t) * 256);
+    idt_set_gate(14, (uint32_t)isr14, 0x08, 0x8E);
     idt_set_gate(32, (uint32_t)isr0, 0x08, 0x8E);
     idt_set_gate(33, (uint32_t)isr1, 0x08, 0x8E);
     idt_flush((uint32_t)&idt_p);

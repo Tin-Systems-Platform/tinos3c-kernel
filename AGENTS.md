@@ -26,3 +26,4 @@ Most kernel source code is located in the `kernel/` directory.
 - Do not modify temporary/debug components unless necessary or explicitly requested.
 - Preserve existing interfaces unless there is a good reason to change them.
 - If a function is intended for reuse across multiple subsystems, implement it in kernel/lib. Reuse an existing `kernel/lib` implementation when one is available instead of creating a duplicate. Functions specific to a subsystem should remain internal to that subsystem.
+- Everything memory related MUST be safe and validate pointers if those places need doing so.
