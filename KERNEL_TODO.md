@@ -16,11 +16,22 @@
 - [ ] Mouse drivers
 - [ ] Network drivers
 - [ ] Audio drivers
+- [ ] Disk drivers
+- [ ] PCIe drivers
+- [ ] AHCI Drivers
 
 ## Stability
 - [ ] Fix bugs when having bugs
 - [ ] Test kernel stability
 - [ ] Handle kernel panics gracefully
 
+## Utility
+- [ ] Power management
+- [ ] ACPI integration
+- [ ] Scheduler
+- [ ] Filesystem stuff
+
+
 ## Internal
 - [ ] Remove the "debug" console from the kernel
+- [ ] Port kernel to x86_64 long mode
