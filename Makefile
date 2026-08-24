@@ -21,7 +21,7 @@ KERNEL_OBJS := $(addprefix bin/kernel/, $(KERNEL_S_SOURCES:.S=.S.o) $(KERNEL_C_S
 # Flags
 ASFLAGS = -f elf64 -g -F dwarf
 CCFLAGS = -m64 -std=gnu11 -ffreestanding -Wall -Wextra -nostdlib -I kernel -I $(UACPI_DIR)/include -fno-stack-protector -Wno-unused-parameter -fno-stack-check -fno-lto -mno-mmx -mno-80387 -mno-sse -mno-sse2 -mno-red-zone -fno-pic -mcmodel=kernel
-QEMUFLAGS = -debugcon stdio -cdrom bin/$(IMAGE_NAME).iso -boot d
+QEMUFLAGS = -m 512M -debugcon stdio -cdrom bin/$(IMAGE_NAME).iso -boot d
 LDFLAGS = -m elf_x86_64 -Tkernel/linker.ld -z noexecstack
 
 # Output image name

@@ -39,6 +39,7 @@ int init_acpi(void) {
         //log_error("uacpi_initialize error: %s", uacpi_status_to_string(ret));
         print("uacpi_initialize error: ");
         print(uacpi_status_to_string(ret));
+        print("\n");
         return -ENODEV;
     }
 
@@ -48,6 +49,7 @@ int init_acpi(void) {
         //log_error("uacpi_namespace_load error: %s", uacpi_status_to_string(ret));
         print("uacpi_namespace_load error: ");
         print(uacpi_status_to_string(ret));
+        print("\n");
         return -ENODEV;
     }
 
@@ -58,6 +60,7 @@ int init_acpi(void) {
 
         print("uacpi_namespace_initialize error: ");
         print(uacpi_status_to_string(ret));
+        print("\n");
         return -ENODEV;
     }
 
@@ -68,6 +71,7 @@ int init_acpi(void) {
         //log_error("uACPI GPE initialization error: %s", uacpi_status_to_string(ret));
         print("uACPI GPE initialization error: ");
         print(uacpi_status_to_string(ret));
+        print("\n");
         return -ENODEV;
     }
 
@@ -83,9 +87,11 @@ void _main(struct multiboot_info_t *mboot_info, uint32_t mboot_magic) {
     asm volatile("sti"); // Enable interrupts after PIC remapping
 
     uint64_t total_memory = 0;
-
+    
     pmm_init();
 
+    scroll_screen();
+    scroll_screen();
 	uint8_t* mmap_start =
         (uint8_t*)(uintptr_t)mboot_info->mmap_addr;
 
@@ -132,8 +138,10 @@ void _main(struct multiboot_info_t *mboot_info, uint32_t mboot_magic) {
     print("Usable memory: ");
     print_uint64(total_memory / (1024 * 1024));
     print(" MB\n");
+    scroll_screen();
 
     vmm_init();
+   
 
     init_acpi();
     console();

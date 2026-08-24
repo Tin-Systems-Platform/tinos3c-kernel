@@ -17,4 +17,5 @@ void pmm_free_page(uint64_t address);
 uint64_t pmm_get_free_pages(void);
 uint64_t pmm_get_total_pages(void);
 
+uint64_t pmm_alloc_page_low(void);
 #endif

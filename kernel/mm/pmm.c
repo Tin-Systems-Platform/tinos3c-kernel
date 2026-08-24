@@ -208,3 +208,25 @@ uint64_t pmm_get_total_pages(void)
 {
     return total_pages;
 }
+
+/*
+ * Allocate one physical page strictly within the first 8 MiB (low memory).
+ * Needed for early paging structures before a full direct map is live.
+ */
+uint64_t pmm_alloc_page_low(void)
+{
+    // 2048 sivua = tasan 8 MiB (olettaen että PMM_PAGE_SIZE on 4096)
+    for (uint64_t page = 0; page < 2048; page++)
+    {
+        if (!page_used(page))
+        {
+            set_page(page);
+            free_pages--;
+            return page * PMM_PAGE_SIZE;
+        }
+    }
+
+    /* No low memory available. Fallback to normal if this happens, 
+       but for early boot this shouldn't fail. */
+    return 0;
+}
