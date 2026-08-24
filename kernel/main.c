@@ -17,6 +17,15 @@ struct multiboot_header_t mboot_header = {
 
 typedef struct multiboot_memory_map_t mmap_entry_t;
 
+void internal_panic(const char *message) {
+    print("[PANIC] ");
+    print(message);
+    print("\n");
+    while (1) {
+        asm volatile("hlt");
+    }
+}
+
 void _main(struct multiboot_info_t *mboot_info, uint32_t mboot_magic) {
     init_gdt();
     init_idt();
@@ -79,4 +88,5 @@ void _main(struct multiboot_info_t *mboot_info, uint32_t mboot_magic) {
     vmm_init();
 
     console();
+    internal_panic("Kernel has panic due to something going wrong internally");
 }

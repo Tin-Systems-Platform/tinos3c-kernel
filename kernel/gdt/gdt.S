@@ -1,17 +1,16 @@
+[BITS 64]
+
 global gdt_flush
 gdt_flush:
-    mov eax, [esp + 4]  ; Haetaan gdt_p osoite pinosta
-    lgdt [eax]          ; Ladataan uusi GDT
-
-    ; Päivitetään datasegmentit (0x10 on GDT:n kolmas merkintä)
+    ; The 10-byte GDTR operand is the first SysV AMD64 argument.
+    lgdt [rdi]
+    ; GRUB left the data segments at selector 0x18.  The kernel GDT uses
+    ; selector 0x10 for its data descriptor; leaving SS stale makes the
+    ; first interrupt return fault with #GP(0x18).
     mov ax, 0x10
     mov ds, ax
     mov es, ax
+    mov ss, ax
     mov fs, ax
     mov gs, ax
-    mov ss, ax
-
-    ; Päivitetään koodisegmentti (0x08) tekemällä Far Jump
-    jmp 0x08:.flush
-.flush:
     ret

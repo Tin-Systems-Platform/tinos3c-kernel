@@ -1,7 +1,12 @@
 #include "pmm.h"
 #include <lib/std/stdio.h>
 
-#define MAX_PHYSICAL_MEMORY (4ULL * 1024 * 1024 * 1024)
+/*
+ * Keep the bootstrap bitmap in the kernel image.  This tracks 64 GiB of
+ * physical memory using 2 MiB of storage and, unlike the old 4 GiB limit,
+ * does not truncate physical addresses to 32 bits.
+ */
+#define MAX_PHYSICAL_MEMORY (64ULL * 1024 * 1024 * 1024)
 #define MAX_PAGES (MAX_PHYSICAL_MEMORY / PMM_PAGE_SIZE)
 #define BITMAP_SIZE ((MAX_PAGES + 7) / 8)
 

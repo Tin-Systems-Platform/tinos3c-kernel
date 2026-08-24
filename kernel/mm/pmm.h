@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #define PMM_PAGE_SIZE 4096
+#define PMM_MAX_PHYSICAL_MEMORY (64ULL * 1024 * 1024 * 1024)
 
 void pmm_init(void);
 
