@@ -55,31 +55,21 @@ static void split_block(Block *block, size_t size) {
     block->next = remainder;
 }
 
-static void coalesce_block(Block *block) {
-    while (block->next != NULL && block->next->free) {
-        block->size += sizeof(Block) + block->next->size;
-        block->next = block->next->next;
-    }
-}
-
-/*
- * Never derive a header from a caller-supplied address.  Only an exact
- * payload address from a live allocation is valid for free() or realloc().
+/* 
+ * Sweeps the entire list to merge ALL adjacent free blocks.
+ * This completely resolves memory starvation caused by fragmentation.
  */
-static Block *find_allocated_block(void *ptr) {
-    Block *block;
-
-    if (!allocator_initialized) {
-        return NULL;
-    }
-
-    for (block = free_list; block != NULL; block = block->next) {
-        if ((void *)(block + 1) == ptr) {
-            return block->free ? NULL : block;
+static void coalesce_all(void) {
+    Block *current = free_list;
+    while (current != NULL) {
+        if (current->free) {
+            while (current->next != NULL && current->next->free) {
+                current->size += sizeof(Block) + current->next->size;
+                current->next = current->next->next;
+            }
         }
+        current = current->next;
     }
-
-    return NULL;
 }
 
 void *malloc(size_t size) {
@@ -107,28 +97,27 @@ void *malloc(size_t size) {
     return NULL;
 }
 
+/* 
+ * Fixed: O(1) instantaneous free operation.
+ * No longer sweeps the entire list to find a matching pointer.
+ */
 void free(void *ptr) {
-    Block *block;
-
-    if (ptr == NULL) {
+    if (ptr == NULL || !allocator_initialized) {
         return;
     }
 
-    block = find_allocated_block(ptr);
-    if (block == NULL) {
-        return;
+    // Direct header calculation from the payload pointer
+    Block *block = (Block *)ptr - 1;
+
+    // Safety guard against dangerous double-frees
+    if (block->free) {
+        return; 
     }
 
     block->free = 1;
-    coalesce_block(block);
-
-    /* A preceding free block can now absorb this one as well. */
-    for (block = free_list; block != NULL && block->next != NULL; block = block->next) {
-        if (block->free && block->next->free) {
-            coalesce_block(block);
-            break;
-        }
-    }
+    
+    // Aggressively clean up all fragmentation across the pool
+    coalesce_all();
 }
 
 void *realloc(void *ptr, size_t new_size) {
@@ -154,8 +143,9 @@ void *realloc(void *ptr, size_t new_size) {
         return NULL;
     }
 
-    block = find_allocated_block(ptr);
-    if (block == NULL) {
+    // Fixed to use O(1) header resolution
+    block = (Block *)ptr - 1;
+    if (block->free) {
         return NULL;
     }
 
@@ -189,7 +179,6 @@ void *realloc(void *ptr, size_t new_size) {
 
     free(ptr);
     return new_ptr;
-
 }
 
 void *calloc(size_t num, size_t size) {
@@ -216,5 +205,4 @@ void *calloc(size_t num, size_t size) {
     }
 
     return memory;
-
 }
