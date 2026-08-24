@@ -573,3 +573,124 @@ void *uacpi_kernel_alloc(uacpi_size size) {
 void uacpi_kernel_free(void *mem) {
     free(mem);
 }
+
+uint64_t time_get_ns(void) {
+    uacpi_u64 timer_ticks;
+    uacpi_u64 timer_frequency;
+    return 0;
+}
+
+static inline uint64_t rdtsc(void)
+{
+    uint32_t lo;
+    uint32_t hi;
+
+    __asm__ volatile (
+        "rdtsc"
+        : "=a"(lo), "=d"(hi)
+    );
+
+    return ((uint64_t)hi << 32) | lo;
+}
+
+uacpi_u64 uacpi_kernel_get_nanoseconds_since_boot(void) {
+  return time_get_ns();
+}
+
+void uacpi_kernel_stall(uacpi_u8 usec)
+{
+    uint64_t start = time_get_ns();
+
+    while ((time_get_ns() - start) < ((uint64_t)usec * 1000ULL)) {
+        __asm__ volatile ("pause");
+    }
+}
+
+void uacpi_kernel_sleep(uacpi_u64 msec)
+{
+    uacpi_u64 start = time_get_ns();
+    uacpi_u64 duration = msec * 1000000ULL;
+
+    while ((time_get_ns() - start) < duration) {
+        __asm__ volatile ("pause");
+    }
+}
+
+typedef struct {
+    //spinlock_t lock;
+} tinos_uacpi_mutex_t;
+
+uacpi_handle uacpi_kernel_create_mutex(void)
+{
+    tinos_uacpi_mutex_t *mutex =
+        malloc(sizeof(*mutex));
+
+    if (mutex == NULL)
+        return NULL;
+
+    return (uacpi_handle)mutex;
+}
+
+void uacpi_kernel_free_mutex(uacpi_handle handle)
+{
+    if (handle == NULL)
+        return;
+
+    free(handle);
+}
+
+typedef struct {
+    volatile bool signaled;
+} tinos_uacpi_event_t;
+
+uacpi_handle uacpi_kernel_create_event(void)
+{
+    tinos_uacpi_event_t *event =
+        malloc(sizeof(*event));
+
+    if (!event)
+        return NULL;
+
+    event->signaled = false;
+
+    return (uacpi_handle)event;
+}
+
+void uacpi_kernel_free_event(uacpi_handle handle)
+{
+    if (!handle)
+        return;
+
+    free(handle);
+}
+
+uacpi_thread_id uacpi_kernel_get_thread_id(void)
+{
+    return (uacpi_thread_id)(uintptr_t)1;
+}
+
+uacpi_interrupt_state uacpi_kernel_disable_interrupts(void)
+{
+    uint64_t flags;
+
+    asm volatile (
+        "pushfq\n"
+        "popq %0"
+        : "=r"(flags)
+        :
+        : "memory"
+    );
+
+    asm volatile ("cli" ::: "memory");
+
+    return (uacpi_interrupt_state)flags;
+}
+
+void uacpi_kernel_restore_interrupts(uacpi_interrupt_state state)
+{
+    uint64_t flags = (uint64_t)state;
+
+    if (flags & (1ULL << 9))
+        asm volatile ("sti" ::: "memory");
+}
+
