@@ -5,6 +5,7 @@
 #include <lib/std/stdint.h>
 #include <lib/std/stdio.h>
 #include <mm/vmm.h>
+#include <uacpi/internal/stdlib.h>
 
 #define ACPI_PAGE_SIZE          0x1000ULL
 #define ACPI_MAP_WINDOW_BASE    0xFFFF800000000000ULL
@@ -622,21 +623,12 @@ typedef struct {
 
 uacpi_handle uacpi_kernel_create_mutex(void)
 {
-    tinos_uacpi_mutex_t *mutex =
-        malloc(sizeof(*mutex));
-
-    if (mutex == NULL)
-        return NULL;
-
-    return (uacpi_handle)mutex;
+    return  UACPI_STATUS_OK;
 }
 
 void uacpi_kernel_free_mutex(uacpi_handle handle)
 {
-    if (handle == NULL)
-        return;
-
-    free(handle);
+    
 }
 
 typedef struct {
@@ -692,5 +684,113 @@ void uacpi_kernel_restore_interrupts(uacpi_interrupt_state state)
 
     if (flags & (1ULL << 9))
         asm volatile ("sti" ::: "memory");
+}
+
+uacpi_status uacpi_kernel_acquire_mutex(uacpi_handle, uacpi_u16) {
+    return UACPI_STATUS_OK;
+}
+
+void uacpi_kernel_release_mutex(uacpi_handle) {} // This doesn't need anything since we don't use mutexes in the kernel
+
+uacpi_bool uacpi_kernel_wait_for_event(uacpi_handle handle, uacpi_u16 timeout) {
+     if (!handle) return UACPI_STATUS_INVALID_ARGUMENT;
+    
+    tinos_uacpi_event_t *ev = (tinos_uacpi_event_t*)handle;
+
+    if (ev->signaled) {
+        ev->signaled = UACPI_FALSE; 
+        return UACPI_STATUS_OK;
+    }
+
+    if (timeout == 0) {
+        return UACPI_STATUS_TIMEOUT;
+    }
+    return UACPI_STATUS_TIMEOUT;
+}
+
+void uacpi_kernel_signal_event(uacpi_handle handle) {
+    if (!handle) {
+        return; // Just return empty for void
+    }
+    
+    tinos_uacpi_event_t *ev = (tinos_uacpi_event_t*)handle;
+    ev->signaled = UACPI_TRUE;
+}
+
+void uacpi_kernel_reset_event(uacpi_handle handle) {
+    if (handle) {
+        tinos_uacpi_event_t *ev = (tinos_uacpi_event_t*)handle;
+        ev->signaled = UACPI_FALSE;
+    }
+}
+
+uacpi_status uacpi_kernel_handle_firmware_request(uacpi_firmware_request *request) {
+    // Tell uACPI we don't support firmware requests yet
+    return UACPI_STATUS_UNIMPLEMENTED;
+}
+
+uacpi_status uacpi_kernel_install_interrupt_handler(
+    uacpi_u32 irq, uacpi_interrupt_handler handler, uacpi_handle ctx,
+    uacpi_handle *out_irq_handle
+) {
+    // For now, just allocate a small dummy handle or pass back a fake ID.
+    // We treat the IRQ number itself as the handle for simplicity.
+    *out_irq_handle = (uacpi_handle)(uintptr_t)irq;
+    
+    return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_kernel_uninstall_interrupt_handler(
+    uacpi_interrupt_handler handler, uacpi_handle irq_handle
+) {
+    // Nothing to do since the installation was a stub
+    return UACPI_STATUS_OK;
+}
+
+uacpi_handle uacpi_kernel_create_spinlock(void) {
+
+    return (uacpi_handle)0xBAD010C;
+}
+
+void uacpi_kernel_free_spinlock(uacpi_handle handle) {
+    (void)handle;
+}
+
+// NOTE: These return a CPU status/flags type. 
+// If uACPI expects them to return void or a type, adjust accordingly.
+uacpi_cpu_flags uacpi_kernel_lock_spinlock(uacpi_handle handle) {
+    return 0; // Return dummy flags
+}
+
+void uacpi_kernel_unlock_spinlock(uacpi_handle handle, uacpi_cpu_flags flags) {
+    // Nothing to do
+}
+
+uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr *out_rsdp_address) {
+    // Replace 0x12345678 with your actual found physical address of the RSDP
+   uint8_t *bios_mem = (uint8_t*)0xE0000; // Map this to virtual memory if paging is on!
+    
+    for (size_t i = 0; i < 0x20000; i += 16) {
+        if (uacpi_memcmp(&bios_mem[i], "RSD PTR ", 8) == 0) {
+            // Found it! Calculate the physical address
+            *out_rsdp_address = (uacpi_phys_addr)(0xE0000 + i);
+            return UACPI_STATUS_OK;
+        }
+    }
+    
+    return UACPI_STATUS_NOT_FOUND;
+}
+
+uacpi_status uacpi_kernel_schedule_work(
+    uacpi_work_type type, uacpi_work_handler handler, uacpi_handle ctx
+) {
+    // Instead of queueing it for a background thread, just execute it right now!
+    handler(ctx);
+    return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_kernel_wait_for_work_completion(void) {
+    // All work was executed immediately, so everything is already complete!
+    return UACPI_STATUS_OK;
 }
 
