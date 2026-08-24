@@ -3,83 +3,90 @@
 #include <lib/std/stdio.h>
 #include <mm/pmm.h>
 
-/* The kernel runs in 32-bit protected mode and uses two-level x86 paging. */
-#define PAGE_SIZE               0x1000U
-#define PAGE_ENTRIES            1024U
-#define PAGE_ADDRESS_MASK       0xFFFFF000U
-#define PAGE_FLAG_PRESENT       0x001U
-#define PAGE_FLAG_WRITABLE      0x002U
-#define PAGE_FLAG_MASK          0xFFFU
-#define RECURSIVE_DIRECTORY     1023U
-#define RECURSIVE_TABLES_BASE   0xFFC00000U
-#define RECURSIVE_DIRECTORY_VA  0xFFFFF000U
+#define PAGE_SIZE                 0x1000ULL
+#define PAGE_ENTRIES              512U
+#define PAGE_ADDRESS_MASK         0x000FFFFFFFFFF000ULL
+#define PAGE_FLAG_PRESENT         0x001ULL
+#define PAGE_FLAG_WRITABLE        0x002ULL
+#define PAGE_FLAG_MASK            0xFFFULL
+#define BOOTSTRAP_IDENTITY_LIMIT  (8ULL * 1024ULL * 1024ULL)
 
-/* These reside in the kernel image and are covered by the bootstrap map. */
-static uint32_t initial_page_directory[PAGE_ENTRIES]
-    __attribute__((aligned(PAGE_SIZE)));
-static uint32_t initial_page_table[PAGE_ENTRIES]
-    __attribute__((aligned(PAGE_SIZE)));
-
+/* Accessed through the bootstrap identity map until a physical direct map exists. */
+static uint64_t initial_pml4[PAGE_ENTRIES] __attribute__((aligned(PAGE_SIZE)));
+static uint64_t initial_pdpt[PAGE_ENTRIES] __attribute__((aligned(PAGE_SIZE)));
+static uint64_t initial_pd[PAGE_ENTRIES] __attribute__((aligned(PAGE_SIZE)));
+static uint64_t initial_pt[4][PAGE_ENTRIES] __attribute__((aligned(PAGE_SIZE)));
 static int paging_enabled;
 
 static int page_aligned_address(uint64_t address)
 {
-    return (address >> 32) == 0 && (address & (PAGE_SIZE - 1U)) == 0;
+    return (address & (PAGE_SIZE - 1ULL)) == 0;
 }
 
-static uint32_t *active_page_directory(void)
+static int canonical_address(uint64_t address)
 {
-    if (paging_enabled)
-        return (uint32_t *)(uintptr_t)RECURSIVE_DIRECTORY_VA;
-
-    return initial_page_directory;
+    uint64_t upper = address >> 48;
+    return upper == 0 || upper == 0xFFFFULL;
 }
 
-static uint32_t *active_page_table(uint32_t directory_index)
+static void zero_page(uint64_t *page)
 {
-    uint32_t *directory = active_page_directory();
+    uint16_t index;
+    for (index = 0; index < PAGE_ENTRIES; ++index)
+        page[index] = 0;
+}
 
-    if ((directory[directory_index] & PAGE_FLAG_PRESENT) == 0)
+static uint64_t *physical_to_bootstrap_virtual(uint64_t physical_address)
+{
+    if (physical_address >= BOOTSTRAP_IDENTITY_LIMIT ||
+        !page_aligned_address(physical_address))
         return 0;
+    return (uint64_t *)(uintptr_t)physical_address;
+}
 
-    if (paging_enabled) {
-        return (uint32_t *)(uintptr_t)(RECURSIVE_TABLES_BASE +
-                                       directory_index * PAGE_SIZE);
+static uint64_t *entry_table(uint64_t entry)
+{
+    if ((entry & PAGE_FLAG_PRESENT) == 0)
+        return 0;
+    return physical_to_bootstrap_virtual(entry & PAGE_ADDRESS_MASK);
+}
+
+static uint64_t table_entry(uint64_t physical_address)
+{
+    return (physical_address & PAGE_ADDRESS_MASK) |
+           PAGE_FLAG_PRESENT | PAGE_FLAG_WRITABLE;
+}
+
+static uint64_t *allocate_table(void)
+{
+    uint64_t physical_address = pmm_alloc_page();
+    uint64_t *table;
+
+    if (physical_address == 0)
+        return 0;
+    table = physical_to_bootstrap_virtual(physical_address);
+    if (table == 0) {
+        pmm_free_page(physical_address);
+        return 0;
     }
-
-    /* Only the bootstrap table exists before paging is enabled. */
-    if (directory_index == 0)
-        return initial_page_table;
-
-    return 0;
+    zero_page(table);
+    return table;
 }
 
-/* Check a full, page-aligned caller buffer before writing page entries to it. */
-static int page_buffer_is_valid(const void *buffer)
+static uint64_t *next_table(uint64_t *table, uint16_t index)
 {
-    uint32_t address = (uint32_t)(uintptr_t)buffer;
-    uint32_t directory_index;
-    uint32_t table_index;
-    uint32_t *table;
+    uint64_t *next = entry_table(table[index]);
 
-    if (buffer == 0 || (address & (PAGE_SIZE - 1U)) != 0)
+    if (next != 0)
+        return next;
+    next = allocate_table();
+    if (next == 0)
         return 0;
-
-    /* Paging-off pointers are physical/identity addresses; only alignment and
-     * null validation are possible until the VMM owns an address space. */
-    if (!paging_enabled)
-        return 1;
-
-    directory_index = address >> 22;
-    table_index = (address >> 12) & 0x3FFU;
-    table = active_page_table(directory_index);
-
-    return table != 0 &&
-           (table[table_index] & (PAGE_FLAG_PRESENT | PAGE_FLAG_WRITABLE)) ==
-               (PAGE_FLAG_PRESENT | PAGE_FLAG_WRITABLE);
+    table[index] = table_entry((uint64_t)(uintptr_t)next);
+    return next;
 }
 
-static void flush_tlb_page(uint32_t virtual_address)
+static void flush_tlb_page(uint64_t virtual_address)
 {
     asm volatile("invlpg (%0)" : : "r" ((void *)(uintptr_t)virtual_address)
                  : "memory");
@@ -87,175 +94,147 @@ static void flush_tlb_page(uint32_t virtual_address)
 
 static void reload_page_directory(void)
 {
-    uint64_t page_directory =
-        (uint64_t)(uintptr_t)initial_page_directory;
-
-    asm volatile("mov %0, %%cr3" : : "r" (page_directory) : "memory");
+    uint64_t pml4_physical = (uint64_t)(uintptr_t)initial_pml4;
+    asm volatile("mov %0, %%cr3" : : "r" (pml4_physical) : "memory");
 }
 
 void vmm_init(void)
 {
-    print("[VMM] Initializing Virtual Memory Management (VMM) subsystem...\n");
+    print("[VMM] Initializing x86_64 Virtual Memory Management subsystem...\n");
     paging_init();
     print("[VMM] subsystem initialized successfully.\n");
 }
 
-/*
- * Identity-map the first 4 MiB.  This covers the kernel, paging structures,
- * VGA text memory, and the low pages initially returned by the PMM.  The last
- * directory entry maps the directory itself, exposing page tables at
- * 0xFFC00000 after paging is enabled.
- */
+/* Build a four-level identity map for the first 8 MiB. */
 void paging_init(void)
 {
-    uint64_t index;
-    uint64_t cr0;
+    uint16_t index;
+    uint16_t table_index;
 
     if (paging_enabled)
         return;
+    zero_page(initial_pml4);
+    zero_page(initial_pdpt);
+    zero_page(initial_pd);
+    for (table_index = 0; table_index < 4; ++table_index)
+        zero_page(initial_pt[table_index]);
 
-    for (index = 0; index < PAGE_ENTRIES; ++index) {
-        initial_page_directory[index] = 0;
-        initial_page_table[index] = (index * PAGE_SIZE) |
-                                    PAGE_FLAG_PRESENT |
-                                    PAGE_FLAG_WRITABLE;
+    initial_pml4[0] = table_entry((uint64_t)(uintptr_t)initial_pdpt);
+    initial_pdpt[0] = table_entry((uint64_t)(uintptr_t)initial_pd);
+    for (table_index = 0; table_index < 4; ++table_index) {
+        initial_pd[table_index] =
+            table_entry((uint64_t)(uintptr_t)initial_pt[table_index]);
+        for (index = 0; index < PAGE_ENTRIES; ++index)
+            initial_pt[table_index][index] =
+                ((uint64_t)table_index * PAGE_ENTRIES + index) * PAGE_SIZE |
+                PAGE_FLAG_PRESENT | PAGE_FLAG_WRITABLE;
     }
 
-    initial_page_directory[0] =
-        ((uint64_t)(uintptr_t)initial_page_table & PAGE_ADDRESS_MASK) |
-        PAGE_FLAG_PRESENT | PAGE_FLAG_WRITABLE;
-    initial_page_directory[RECURSIVE_DIRECTORY] =
-        ((uint64_t)(uintptr_t)initial_page_directory & PAGE_ADDRESS_MASK) |
-        PAGE_FLAG_PRESENT | PAGE_FLAG_WRITABLE;
-
-    /* Physical address zero is PMM's allocation-failure sentinel. */
     pmm_reserve_region(0, PAGE_SIZE);
-
     reload_page_directory();
-    asm volatile("mov %%cr0, %0" : "=r" (cr0));
-    cr0 |= 0x80000000U;
-    asm volatile("mov %0, %%cr0" : : "r" (cr0) : "memory");
     paging_enabled = 1;
-
-    print("[PAGING] Identity-mapped first 4 MiB.\n");
+    print("[PAGING] Four-level identity map for first 8 MiB installed.\n");
 }
 
 void map_page(uint64_t virtual_address, uint64_t physical_address,
               uint64_t flags)
 {
-    uint32_t virtual_page;
-    uint32_t physical_page;
-    uint32_t directory_index;
-    uint32_t table_index;
-    uint32_t *directory;
-    uint32_t *table;
-    uint64_t table_physical;
+    uint64_t *pdpt;
+    uint64_t *pd;
+    uint64_t *pt;
+    uint16_t pml4_index;
+    uint16_t pdpt_index;
+    uint16_t pd_index;
+    uint16_t pt_index;
 
-    if (!paging_enabled || !page_aligned_address(virtual_address) ||
+    if (!paging_enabled || !canonical_address(virtual_address) ||
+        !page_aligned_address(virtual_address) ||
         !page_aligned_address(physical_address) ||
-        (flags & ~(uint64_t)PAGE_FLAG_MASK) != 0)
+        (physical_address & ~PAGE_ADDRESS_MASK) != 0 ||
+        (flags & ~PAGE_FLAG_MASK) != 0)
         return;
 
-    virtual_page = (uint32_t)virtual_address;
-    physical_page = (uint32_t)physical_address;
-    directory_index = virtual_page >> 22;
-    table_index = (virtual_page >> 12) & 0x3FFU;
-    directory = active_page_directory();
-
-    /* The recursive slot is owned by the VMM. */
-    if (directory_index == RECURSIVE_DIRECTORY)
+    pml4_index = (uint16_t)((virtual_address >> 39) & 0x1FFULL);
+    pdpt_index = (uint16_t)((virtual_address >> 30) & 0x1FFULL);
+    pd_index = (uint16_t)((virtual_address >> 21) & 0x1FFULL);
+    pt_index = (uint16_t)((virtual_address >> 12) & 0x1FFULL);
+    pdpt = next_table(initial_pml4, pml4_index);
+    pd = pdpt == 0 ? 0 : next_table(pdpt, pdpt_index);
+    pt = pd == 0 ? 0 : next_table(pd, pd_index);
+    if (pt == 0)
         return;
 
-    table = active_page_table(directory_index);
-    if (table == 0) {
-        table_physical = pmm_alloc_page();
-        if (table_physical == 0 || !page_aligned_address(table_physical))
-            return;
-
-        directory[directory_index] =
-            ((uint32_t)table_physical & PAGE_ADDRESS_MASK) |
-            PAGE_FLAG_PRESENT | PAGE_FLAG_WRITABLE;
-        reload_page_directory();
-
-        table = active_page_table(directory_index);
-        for (uint32_t index = 0; index < PAGE_ENTRIES; ++index)
-            table[index] = 0;
-    }
-
-    table[table_index] = physical_page |
-                         ((uint32_t)flags & PAGE_FLAG_MASK) |
-                         PAGE_FLAG_PRESENT;
-    flush_tlb_page(virtual_page);
+    pt[pt_index] = (physical_address & PAGE_ADDRESS_MASK) |
+                   (flags & PAGE_FLAG_MASK) | PAGE_FLAG_PRESENT;
+    flush_tlb_page(virtual_address);
 }
 
 void unmap_page(uint64_t virtual_address)
 {
-    uint32_t virtual_page;
-    uint32_t directory_index;
-    uint32_t table_index;
-    uint32_t *table;
+    uint64_t *pdpt;
+    uint64_t *pd;
+    uint64_t *pt;
+    uint16_t pml4_index;
+    uint16_t pdpt_index;
+    uint16_t pd_index;
+    uint16_t pt_index;
 
-    if (!paging_enabled || !page_aligned_address(virtual_address))
+    if (!paging_enabled || !canonical_address(virtual_address) ||
+        !page_aligned_address(virtual_address))
         return;
-
-    virtual_page = (uint32_t)virtual_address;
-    directory_index = virtual_page >> 22;
-    table_index = (virtual_page >> 12) & 0x3FFU;
-
-    if (directory_index == RECURSIVE_DIRECTORY)
+    pml4_index = (uint16_t)((virtual_address >> 39) & 0x1FFULL);
+    pdpt_index = (uint16_t)((virtual_address >> 30) & 0x1FFULL);
+    pd_index = (uint16_t)((virtual_address >> 21) & 0x1FFULL);
+    pt_index = (uint16_t)((virtual_address >> 12) & 0x1FFULL);
+    pdpt = entry_table(initial_pml4[pml4_index]);
+    pd = pdpt == 0 ? 0 : entry_table(pdpt[pdpt_index]);
+    pt = pd == 0 ? 0 : entry_table(pd[pd_index]);
+    if (pt == 0)
         return;
-
-    table = active_page_table(directory_index);
-    if (table == 0)
-        return;
-
-    table[table_index] = 0;
-    flush_tlb_page(virtual_page);
+    pt[pt_index] = 0;
+    flush_tlb_page(virtual_address);
 }
 
 uint64_t *get_page_table(uint64_t virtual_address)
 {
-    uint32_t directory_index;
+    uint64_t *pdpt;
+    uint64_t *pd;
+    uint16_t pml4_index;
+    uint16_t pdpt_index;
+    uint16_t pd_index;
 
-    if ((virtual_address >> 32) != 0)
+    if (!paging_enabled || !canonical_address(virtual_address))
         return 0;
-
-    directory_index = ((uint32_t)virtual_address >> 22) & 0x3FFU;
-    return (uint64_t *)active_page_table(directory_index);
+    pml4_index = (uint16_t)((virtual_address >> 39) & 0x1FFULL);
+    pdpt_index = (uint16_t)((virtual_address >> 30) & 0x1FFULL);
+    pd_index = (uint16_t)((virtual_address >> 21) & 0x1FFULL);
+    pdpt = entry_table(initial_pml4[pml4_index]);
+    pd = pdpt == 0 ? 0 : entry_table(pdpt[pdpt_index]);
+    return pd == 0 ? 0 : entry_table(pd[pd_index]);
 }
 
-/*
- * Construct a caller-provided 4 MiB identity map.  Although the interface
- * uses uint64_t pointers, x86 page entries are 32 bits in this kernel.
- */
 void get_all_pages(uint64_t *page_table, uint64_t *page_directory)
 {
-    uint32_t *table = (uint32_t *)page_table;
-    uint32_t *directory = (uint32_t *)page_directory;
-    uint32_t index;
+    uint16_t index;
 
-    if (!page_buffer_is_valid(table) || !page_buffer_is_valid(directory) ||
-        table == directory)
+    if (page_table == 0 || page_directory == 0 || page_table == page_directory ||
+        !page_aligned_address((uint64_t)(uintptr_t)page_table) ||
+        !page_aligned_address((uint64_t)(uintptr_t)page_directory))
         return;
-
     for (index = 0; index < PAGE_ENTRIES; ++index)
-        table[index] = (index * PAGE_SIZE) |
-                       PAGE_FLAG_PRESENT | PAGE_FLAG_WRITABLE;
-    
-    directory[0] = ((uint32_t)(uintptr_t)table & PAGE_ADDRESS_MASK) |
-                   PAGE_FLAG_PRESENT | PAGE_FLAG_WRITABLE;
+        page_table[index] = ((uint64_t)index * PAGE_SIZE) |
+                            PAGE_FLAG_PRESENT | PAGE_FLAG_WRITABLE;
+    zero_page(page_directory);
+    page_directory[0] = table_entry((uint64_t)(uintptr_t)page_table);
 }
 
 void vmm_page_fault_handler(void)
 {
     uint64_t fault_address;
-
     asm volatile("mov %%cr2, %0" : "=r" (fault_address));
     print("[VMM] Page fault at ");
     print_hex(fault_address);
     print("\n");
-
-    /* Returning would re-execute the faulting instruction forever. */
     asm volatile("cli");
     for (;;)
         asm volatile("hlt");
