@@ -1,7 +1,7 @@
 #ifndef STDLIB_H
 #define STDLIB_H
 
-typedef unsigned int size_t;
+#include "stdint.h"
 
 /* Null pointer constant. */
 #define NULL ((void *)0)

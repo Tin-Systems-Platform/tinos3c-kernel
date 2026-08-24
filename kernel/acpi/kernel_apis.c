@@ -1,6 +1,7 @@
 #include <uacpi/kernel_api.h>
 
 #include <drivers/pci/pci.h>
+#include <lib/std/stdlib.h>
 #include <lib/std/stdint.h>
 #include <lib/std/stdio.h>
 #include <mm/vmm.h>
@@ -392,4 +393,183 @@ uacpi_status uacpi_kernel_pci_write32(
     );
 
     return UACPI_STATUS_OK;
+}
+
+typedef struct {
+    uacpi_io_addr base;
+    uacpi_size len;
+} tinos_io_handle_t;
+
+uacpi_status uacpi_kernel_io_map(
+    uacpi_io_addr base,
+    uacpi_size len,
+    uacpi_handle *out_handle
+) {
+    if (out_handle == NULL || len == 0)
+        return UACPI_STATUS_INVALID_ARGUMENT;
+
+    tinos_io_handle_t *io =
+        uacpi_kernel_alloc(sizeof(tinos_io_handle_t));
+
+    if (io == NULL)
+        return UACPI_STATUS_OUT_OF_MEMORY;
+
+    io->base = base;
+    io->len = len;
+
+    *out_handle = (uacpi_handle)io;
+
+    return UACPI_STATUS_OK;
+}
+
+void uacpi_kernel_io_unmap(uacpi_handle handle)
+{
+    if (handle == NULL)
+        return;
+
+    uacpi_kernel_free(handle);
+}
+
+static inline uint16_t inw(uint16_t port)
+{
+    uint16_t value;
+
+    __asm__ volatile (
+        "inw %1, %0"
+        : "=a"(value)
+        : "Nd"(port)
+    );
+
+    return value;
+}
+
+static inline void outw(uint16_t port, uint16_t value)
+{
+    __asm__ volatile (
+        "outw %0, %1"
+        :
+        : "a"(value), "Nd"(port)
+    );
+}
+
+uacpi_status uacpi_kernel_io_read8(
+    uacpi_handle handle,
+    uacpi_size offset,
+    uacpi_u8 *out_value
+) {
+    if (handle == NULL || out_value == NULL)
+        return UACPI_STATUS_INVALID_ARGUMENT;
+
+    tinos_io_handle_t *io =
+        (tinos_io_handle_t *)handle;
+
+    if (offset >= io->len)
+        return UACPI_STATUS_INVALID_ARGUMENT;
+
+    *out_value = inb((uint16_t)(io->base + offset));
+
+    return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_kernel_io_read16(
+    uacpi_handle handle,
+    uacpi_size offset,
+    uacpi_u16 *out_value
+) {
+    if (handle == NULL || out_value == NULL)
+        return UACPI_STATUS_INVALID_ARGUMENT;
+
+    tinos_io_handle_t *io =
+        (tinos_io_handle_t *)handle;
+
+    if (offset + 2 > io->len)
+        return UACPI_STATUS_INVALID_ARGUMENT;
+
+    *out_value = inw((uint16_t)(io->base + offset));
+
+    return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_kernel_io_read32(
+    uacpi_handle handle,
+    uacpi_size offset,
+    uacpi_u32 *out_value
+) {
+    if (handle == NULL || out_value == NULL)
+        return UACPI_STATUS_INVALID_ARGUMENT;
+
+    tinos_io_handle_t *io =
+        (tinos_io_handle_t *)handle;
+
+    if (offset + 4 > io->len)
+        return UACPI_STATUS_INVALID_ARGUMENT;
+
+    *out_value = inl((uint16_t)(io->base + offset));
+
+    return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_kernel_io_write8(
+    uacpi_handle handle,
+    uacpi_size offset,
+    uacpi_u8 in_value
+) {
+    if (handle == NULL)
+        return UACPI_STATUS_INVALID_ARGUMENT;
+
+    tinos_io_handle_t *io =
+        (tinos_io_handle_t *)handle;
+
+    if (offset >= io->len)
+        return UACPI_STATUS_INVALID_ARGUMENT;
+
+    outb((uint16_t)(io->base + offset), in_value);
+
+    return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_kernel_io_write16(
+    uacpi_handle handle,
+    uacpi_size offset,
+    uacpi_u16 in_value
+) {
+    if (handle == NULL)
+        return UACPI_STATUS_INVALID_ARGUMENT;
+
+    tinos_io_handle_t *io =
+        (tinos_io_handle_t *)handle;
+
+    if (offset >= io->len)
+        return UACPI_STATUS_INVALID_ARGUMENT;
+
+    outw((uint16_t)(io->base + offset), in_value);
+
+    return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_kernel_io_write32(
+    uacpi_handle handle,
+    uacpi_size offset,
+    uacpi_u32 in_value
+) {
+    if (handle == NULL)
+        return UACPI_STATUS_INVALID_ARGUMENT;
+
+    tinos_io_handle_t *io =
+        (tinos_io_handle_t *)handle;
+
+    if (offset >= io->len)
+        return UACPI_STATUS_INVALID_ARGUMENT;
+
+    outl((uint16_t)(io->base + offset), in_value);
+
+    return UACPI_STATUS_OK;
+}
+
+void *uacpi_kernel_alloc(uacpi_size size) {
+    *malloc(size);
+}
+
+void uacpi_kernel_free(void *mem) {
+    free(mem);
 }
