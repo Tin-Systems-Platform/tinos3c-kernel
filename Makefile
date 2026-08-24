@@ -39,7 +39,7 @@ bin/kernel/%.S.o: kernel/%.S
 
 kernel: $(KERNEL_OBJS)
 	@echo " LD kernel/*"
-	@$(LD) $(LDFLAGS) $^ -o bin/kernel.elf
+	$(LD) $(LDFLAGS) $^ -o bin/kernel.elf
 
 iso: kernel
 	@grub-file ./bin/kernel.elf; \

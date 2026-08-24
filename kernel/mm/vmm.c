@@ -87,7 +87,8 @@ static void flush_tlb_page(uint32_t virtual_address)
 
 static void reload_page_directory(void)
 {
-    uint32_t page_directory = (uint32_t)(uintptr_t)initial_page_directory;
+    uint64_t page_directory =
+        (uint64_t)(uintptr_t)initial_page_directory;
 
     asm volatile("mov %0, %%cr3" : : "r" (page_directory) : "memory");
 }
@@ -107,8 +108,8 @@ void vmm_init(void)
  */
 void paging_init(void)
 {
-    uint32_t index;
-    uint32_t cr0;
+    uint64_t index;
+    uint64_t cr0;
 
     if (paging_enabled)
         return;
@@ -121,10 +122,10 @@ void paging_init(void)
     }
 
     initial_page_directory[0] =
-        ((uint32_t)(uintptr_t)initial_page_table & PAGE_ADDRESS_MASK) |
+        ((uint64_t)(uintptr_t)initial_page_table & PAGE_ADDRESS_MASK) |
         PAGE_FLAG_PRESENT | PAGE_FLAG_WRITABLE;
     initial_page_directory[RECURSIVE_DIRECTORY] =
-        ((uint32_t)(uintptr_t)initial_page_directory & PAGE_ADDRESS_MASK) |
+        ((uint64_t)(uintptr_t)initial_page_directory & PAGE_ADDRESS_MASK) |
         PAGE_FLAG_PRESENT | PAGE_FLAG_WRITABLE;
 
     /* Physical address zero is PMM's allocation-failure sentinel. */
@@ -240,14 +241,14 @@ void get_all_pages(uint64_t *page_table, uint64_t *page_directory)
     for (index = 0; index < PAGE_ENTRIES; ++index)
         table[index] = (index * PAGE_SIZE) |
                        PAGE_FLAG_PRESENT | PAGE_FLAG_WRITABLE;
-
+    
     directory[0] = ((uint32_t)(uintptr_t)table & PAGE_ADDRESS_MASK) |
                    PAGE_FLAG_PRESENT | PAGE_FLAG_WRITABLE;
 }
 
 void vmm_page_fault_handler(void)
 {
-    uint32_t fault_address;
+    uint64_t fault_address;
 
     asm volatile("mov %%cr2, %0" : "=r" (fault_address));
     print("[VMM] Page fault at ");

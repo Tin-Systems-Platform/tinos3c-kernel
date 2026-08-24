@@ -12,6 +12,8 @@ gdt_flush:
     mov ss, ax
 
     ; Päivitetään koodisegmentti (0x08) tekemällä Far Jump
-    jmp 0x08:.flush
+    push 0x08
+    push .flush
+    retfq
 .flush:
     ret
