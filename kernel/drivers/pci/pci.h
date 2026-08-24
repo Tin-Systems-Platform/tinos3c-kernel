@@ -75,4 +75,22 @@ void pci_config_write32(
     uint32_t value
 );
 
+
+void pci_config_write8(
+    uint8_t bus,
+    uint8_t device,
+    uint8_t function,
+    uint8_t offset,
+    uint8_t value
+);
+
+void pci_config_write16(
+    uint8_t bus,
+    uint8_t device,
+    uint8_t function,
+    uint8_t offset,
+    uint16_t value
+);
+
+
 #endif // PCI_H

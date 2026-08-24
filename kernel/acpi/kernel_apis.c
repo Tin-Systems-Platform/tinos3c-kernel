@@ -1,5 +1,6 @@
 #include <uacpi/kernel_api.h>
 
+#include <drivers/pci/pci.h>
 #include <lib/std/stdint.h>
 #include <lib/std/stdio.h>
 #include <mm/vmm.h>
@@ -226,4 +227,169 @@ void uacpi_kernel_unmap(void *addr, uacpi_size len)
 void uacpi_kernel_log(uacpi_log_level, const uacpi_char*) {    
     print("[uACPI] ");
     print("log message\n");
+}
+
+typedef struct {
+    uacpi_pci_address address;
+} tinos_pci_handle_t;
+
+uacpi_status uacpi_kernel_pci_device_open(
+    uacpi_pci_address address,
+    uacpi_handle *out_handle
+) {
+    if (out_handle == NULL) {
+        return UACPI_STATUS_INVALID_ARGUMENT;
+    }
+
+    tinos_pci_handle_t *handle =
+        uacpi_kernel_alloc(sizeof(tinos_pci_handle_t));
+
+    if (handle == NULL) {
+        return UACPI_STATUS_OUT_OF_MEMORY;
+    }
+
+    handle->address = address;
+
+    *out_handle = (uacpi_handle)handle;
+
+    return UACPI_STATUS_OK;
+}
+
+
+void uacpi_kernel_pci_device_close(
+    uacpi_handle handle
+) {
+    if (handle == NULL) {
+        return;
+    }
+
+    uacpi_kernel_free(handle);
+}
+
+static tinos_pci_handle_t *pci_handle(uacpi_handle handle)
+{
+    return (tinos_pci_handle_t *)handle;
+}
+
+uacpi_status uacpi_kernel_pci_read8(
+    uacpi_handle device,
+    uacpi_size offset,
+    uacpi_u8 *value
+) {
+    if (device == NULL || value == NULL)
+        return UACPI_STATUS_INVALID_ARGUMENT;
+
+    tinos_pci_handle_t *pci = pci_handle(device);
+
+    *value = pci_config_read8(
+        pci->address.bus,
+        pci->address.device,
+        pci->address.function,
+        (uint8_t)offset
+    );
+
+    return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_kernel_pci_read16(
+    uacpi_handle device,
+    uacpi_size offset,
+    uacpi_u16 *value
+) {
+    if (device == NULL || value == NULL)
+        return UACPI_STATUS_INVALID_ARGUMENT;
+
+    tinos_pci_handle_t *pci = pci_handle(device);
+
+    *value = pci_config_read16(
+        pci->address.bus,
+        pci->address.device,
+        pci->address.function,
+        (uint8_t)offset
+    );
+
+    return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_kernel_pci_read32(
+    uacpi_handle device,
+    uacpi_size offset,
+    uacpi_u32 *value
+) {
+    if (device == NULL || value == NULL)
+        return UACPI_STATUS_INVALID_ARGUMENT;
+
+    tinos_pci_handle_t *pci = pci_handle(device);
+
+    *value = pci_config_read32(
+        pci->address.bus,
+        pci->address.device,
+        pci->address.function,
+        (uint8_t)offset
+    );
+
+    return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_kernel_pci_write8(
+    uacpi_handle device,
+    uacpi_size offset,
+    uacpi_u8 value
+) {
+    if (device == NULL)
+        return UACPI_STATUS_INVALID_ARGUMENT;
+
+    tinos_pci_handle_t *pci = pci_handle(device);
+
+    pci_config_write8(
+        pci->address.bus,
+        pci->address.device,
+        pci->address.function,
+        (uint8_t)offset,
+        value
+    );
+
+    return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_kernel_pci_write16(
+    uacpi_handle device,
+    uacpi_size offset,
+    uacpi_u16 value
+) {
+    if (device == NULL)
+        return UACPI_STATUS_INVALID_ARGUMENT;
+
+    tinos_pci_handle_t *pci = pci_handle(device);
+
+    pci_config_write16(
+        pci->address.bus,
+        pci->address.device,
+        pci->address.function,
+        (uint8_t)offset,
+        value
+    );
+
+    return UACPI_STATUS_OK;
+}
+
+uacpi_status uacpi_kernel_pci_write32(
+    uacpi_handle device,
+    uacpi_size offset,
+    uacpi_u32 value
+) {
+    if (device == NULL)
+        return UACPI_STATUS_INVALID_ARGUMENT;
+
+    tinos_pci_handle_t *pci = pci_handle(device);
+
+    pci_config_write32(
+        pci->address.bus,
+        pci->address.device,
+        pci->address.function,
+        (uint8_t)offset,
+        value
+    );
+
+    return UACPI_STATUS_OK;
 }
