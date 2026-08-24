@@ -9,13 +9,13 @@
 #define PAGE_FLAG_PRESENT         0x001ULL
 #define PAGE_FLAG_WRITABLE        0x002ULL
 #define PAGE_FLAG_MASK            0xFFFULL
-#define BOOTSTRAP_IDENTITY_LIMIT  (8ULL * 1024ULL * 1024ULL)
+#define BOOTSTRAP_IDENTITY_LIMIT  (256ULL * 1024ULL * 1024ULL)
 
 /* Accessed through the bootstrap identity map until a physical direct map exists. */
 static uint64_t initial_pml4[PAGE_ENTRIES] __attribute__((aligned(PAGE_SIZE)));
 static uint64_t initial_pdpt[PAGE_ENTRIES] __attribute__((aligned(PAGE_SIZE)));
 static uint64_t initial_pd[PAGE_ENTRIES] __attribute__((aligned(PAGE_SIZE)));
-static uint64_t initial_pt[4][PAGE_ENTRIES] __attribute__((aligned(PAGE_SIZE)));
+static uint64_t initial_pt[128][PAGE_ENTRIES] __attribute__((aligned(PAGE_SIZE)));
 static int paging_enabled;
 
 static int page_aligned_address(uint64_t address)
@@ -59,7 +59,7 @@ static uint64_t table_entry(uint64_t physical_address)
 
 static uint64_t *allocate_table(void)
 {
-    uint64_t physical_address = pmm_alloc_page();
+    uint64_t physical_address = pmm_alloc_page_low(); 
     uint64_t *table;
 
     if (physical_address == 0)
@@ -109,31 +109,37 @@ void vmm_init(void)
 void paging_init(void)
 {
     uint16_t index;
-    uint16_t table_index;
 
     if (paging_enabled)
         return;
+        
     zero_page(initial_pml4);
     zero_page(initial_pdpt);
     zero_page(initial_pd);
-    for (table_index = 0; table_index < 4; ++table_index)
-        zero_page(initial_pt[table_index]);
 
-    initial_pml4[0] = table_entry((uint64_t)(uintptr_t)initial_pdpt);
-    initial_pdpt[0] = table_entry((uint64_t)(uintptr_t)initial_pd);
-    for (table_index = 0; table_index < 4; ++table_index) {
-        initial_pd[table_index] =
-            table_entry((uint64_t)(uintptr_t)initial_pt[table_index]);
-        for (index = 0; index < PAGE_ENTRIES; ++index)
-            initial_pt[table_index][index] =
-                ((uint64_t)table_index * PAGE_ENTRIES + index) * PAGE_SIZE |
-                PAGE_FLAG_PRESENT | PAGE_FLAG_WRITABLE;
+    // PML4[0] osoittaa PDPT-taulukkoon (Present + Writable)
+    initial_pml4[0] = (uint64_t)(uintptr_t)initial_pdpt | 0x003ULL;
+    
+    // PDPT[0] osoittaa PD-taulukkoon (Present + Writable)
+    initial_pdpt[0] = (uint64_t)(uintptr_t)initial_pd | 0x003ULL;
+
+    // Täytetään PD-taulukko 2 MiB suurilla sivuilla (512 entryä * 2 MiB = 1 GiB)
+    for (index = 0; index < PAGE_ENTRIES; ++index) {
+        // 0x080 on bit 7 (Page Size, PS). Se kertoo suorittimelle, 
+        // että tämä sivu on suoraan 2 MiB kokoinen, eikä viittaa PT-taulukkoon!
+        initial_pd[index] = ((uint64_t)index * 2ULL * 1024ULL * 1024ULL) | 
+                            0x083ULL; // Present + Writable + Page Size (0x80)
     }
 
-    pmm_reserve_region(0, PAGE_SIZE);
+    // Päivitetään bootstrap-raja kattamaan koko gigatavu
+    #define BOOTSTRAP_IDENTITY_LIMIT (1024ULL * 1024ULL * 1024ULL)
+    
+    // Kerrotaan PMM:lle, että nämä sivut ovat kernelin käytössä
+    pmm_reserve_region(0, BOOTSTRAP_IDENTITY_LIMIT);
+    
     reload_page_directory();
     paging_enabled = 1;
-    print("[PAGING] Four-level identity map for first 8 MiB installed.\n");
+    print("[PAGING] Massive 1 GiB Identity Map installed using 2 MiB Large Pages.\n");
 }
 
 void map_page(uint64_t virtual_address, uint64_t physical_address,

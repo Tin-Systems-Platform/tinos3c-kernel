@@ -1,4 +1,10 @@
 #include <lib/multiboot.h>
+#include <errno.h>
+
+//EXTERNAL INCLUDES
+#include <uacpi/uacpi.h>
+#include <uacpi/utilities.h>
+#include <uacpi/event.h>
 
 #include <gdt/gdt.h>
 #include <idt/idt.h>
@@ -26,6 +32,52 @@ void internal_panic(const char *message) {
     }
 }
 
+int init_acpi(void) {
+
+    uacpi_status ret = uacpi_initialize(0);
+    if (uacpi_unlikely_error(ret)) {
+        //log_error("uacpi_initialize error: %s", uacpi_status_to_string(ret));
+        print("uacpi_initialize error: ");
+        print(uacpi_status_to_string(ret));
+        print("\n");
+        return -ENODEV;
+    }
+
+
+    ret = uacpi_namespace_load();
+    if (uacpi_unlikely_error(ret)) {
+        //log_error("uacpi_namespace_load error: %s", uacpi_status_to_string(ret));
+        print("uacpi_namespace_load error: ");
+        print(uacpi_status_to_string(ret));
+        print("\n");
+        return -ENODEV;
+    }
+
+  
+    ret = uacpi_namespace_initialize();
+    if (uacpi_unlikely_error(ret)) {
+        //log_error("uacpi_namespace_initialize error: %s", uacpi_status_to_string(ret));
+
+        print("uacpi_namespace_initialize error: ");
+        print(uacpi_status_to_string(ret));
+        print("\n");
+        return -ENODEV;
+    }
+
+    uacpi_set_interrupt_model(UACPI_INTERRUPT_MODEL_IOAPIC);
+
+    ret = uacpi_finalize_gpe_initialization();
+    if (uacpi_unlikely_error(ret)) {
+        //log_error("uACPI GPE initialization error: %s", uacpi_status_to_string(ret));
+        print("uACPI GPE initialization error: ");
+        print(uacpi_status_to_string(ret));
+        print("\n");
+        return -ENODEV;
+    }
+
+    return 0;
+}
+
 void _main(struct multiboot_info_t *mboot_info, uint32_t mboot_magic) {
     init_gdt();
     init_idt();
@@ -35,9 +87,11 @@ void _main(struct multiboot_info_t *mboot_info, uint32_t mboot_magic) {
     asm volatile("sti"); // Enable interrupts after PIC remapping
 
     uint64_t total_memory = 0;
-
+    
     pmm_init();
 
+    scroll_screen();
+    scroll_screen();
 	uint8_t* mmap_start =
         (uint8_t*)(uintptr_t)mboot_info->mmap_addr;
 
@@ -84,9 +138,12 @@ void _main(struct multiboot_info_t *mboot_info, uint32_t mboot_magic) {
     print("Usable memory: ");
     print_uint64(total_memory / (1024 * 1024));
     print(" MB\n");
+    scroll_screen();
 
     vmm_init();
+   
 
+    init_acpi();
     console();
     internal_panic("Kernel has panic due to something going wrong internally");
 }
