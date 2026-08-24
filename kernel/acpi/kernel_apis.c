@@ -1,0 +1,229 @@
+#include <uacpi/kernel_api.h>
+
+#include <lib/std/stdint.h>
+#include <lib/std/stdio.h>
+#include <mm/vmm.h>
+
+#define ACPI_PAGE_SIZE          0x1000ULL
+#define ACPI_MAP_WINDOW_BASE    0xFFFF800000000000ULL
+#define ACPI_MAP_WINDOW_PAGES   16384U
+#define ACPI_MAP_RECORDS        256U
+#define ACPI_PAGE_FLAG_WRITABLE 0x002ULL
+
+struct acpi_mapping {
+    uint64_t virtual_base;
+    uint64_t page_count;
+};
+
+static uint8_t map_slots[ACPI_MAP_WINDOW_PAGES / 8];
+static struct acpi_mapping mappings[ACPI_MAP_RECORDS];
+
+static int slot_is_used(uint32_t slot)
+{
+    return (map_slots[slot / 8] & (uint8_t)(1U << (slot % 8))) != 0;
+}
+
+static void set_slot(uint32_t slot)
+{
+    map_slots[slot / 8] |= (uint8_t)(1U << (slot % 8));
+}
+
+static void clear_slot(uint32_t slot)
+{
+    map_slots[slot / 8] &= (uint8_t)~(1U << (slot % 8));
+}
+
+static int reserve_slots(uint32_t page_count, uint32_t *out_start)
+{
+    uint32_t start;
+    uint32_t index;
+
+    if (out_start == 0 || page_count == 0 ||
+        page_count > ACPI_MAP_WINDOW_PAGES)
+        return 0;
+
+    for (start = 0; start <= ACPI_MAP_WINDOW_PAGES - page_count; ++start) {
+        for (index = 0; index < page_count; ++index) {
+            if (slot_is_used(start + index))
+                break;
+        }
+
+        if (index == page_count) {
+            for (index = 0; index < page_count; ++index)
+                set_slot(start + index);
+            *out_start = start;
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+static void release_slots(uint32_t start, uint32_t page_count)
+{
+    uint32_t index;
+
+    if (start >= ACPI_MAP_WINDOW_PAGES ||
+        page_count > ACPI_MAP_WINDOW_PAGES - start)
+        return;
+
+    for (index = 0; index < page_count; ++index)
+        clear_slot(start + index);
+}
+
+static struct acpi_mapping *reserve_mapping_record(void)
+{
+    uint32_t index;
+
+    for (index = 0; index < ACPI_MAP_RECORDS; ++index) {
+        if (mappings[index].page_count == 0)
+            return &mappings[index];
+    }
+
+    return 0;
+}
+
+static struct acpi_mapping *find_mapping(uint64_t virtual_base,
+                                         uint64_t page_count)
+{
+    uint32_t index;
+
+    for (index = 0; index < ACPI_MAP_RECORDS; ++index) {
+        if (mappings[index].virtual_base == virtual_base &&
+            mappings[index].page_count == page_count)
+            return &mappings[index];
+    }
+
+    return 0;
+}
+
+static int mapping_was_installed(uint64_t virtual_address,
+                                 uint64_t physical_address)
+{
+    uint64_t *page_table;
+    uint16_t page_index;
+
+    page_table = get_page_table(virtual_address);
+    if (page_table == 0)
+        return 0;
+
+    page_index = (uint16_t)((virtual_address >> 12) & 0x1FFULL);
+    return (page_table[page_index] & 0x000FFFFFFFFFF000ULL) ==
+           physical_address;
+}
+
+void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len)
+{
+    uint64_t physical_address = (uint64_t)addr;
+    uint64_t requested_length = (uint64_t)len;
+    uint64_t physical_base;
+    uint64_t offset;
+    uint64_t mapped_length;
+    uint64_t page_count_64;
+    uint64_t virtual_base;
+    uint32_t slot_start;
+    uint32_t page_count;
+    uint32_t index;
+    struct acpi_mapping *record;
+
+    if (requested_length == 0)
+        return UACPI_MAP_FAILED;
+
+    offset = physical_address & (ACPI_PAGE_SIZE - 1ULL);
+    if (requested_length > ~(uint64_t)0 - offset)
+        return UACPI_MAP_FAILED;
+    mapped_length = requested_length + offset;
+    if (mapped_length > ~(uint64_t)0 - (ACPI_PAGE_SIZE - 1ULL))
+        return UACPI_MAP_FAILED;
+
+    mapped_length = (mapped_length + ACPI_PAGE_SIZE - 1ULL) &
+                    ~(ACPI_PAGE_SIZE - 1ULL);
+    page_count_64 = mapped_length / ACPI_PAGE_SIZE;
+    if (page_count_64 == 0 || page_count_64 > ACPI_MAP_WINDOW_PAGES)
+        return UACPI_MAP_FAILED;
+
+    physical_base = physical_address - offset;
+    if (physical_base > ~(uint64_t)0 - mapped_length)
+        return UACPI_MAP_FAILED;
+
+    page_count = (uint32_t)page_count_64;
+    record = reserve_mapping_record();
+    if (record == 0 || !reserve_slots(page_count, &slot_start))
+        return UACPI_MAP_FAILED;
+
+    virtual_base = ACPI_MAP_WINDOW_BASE +
+                   (uint64_t)slot_start * ACPI_PAGE_SIZE;
+    for (index = 0; index < page_count; ++index) {
+        map_page(virtual_base + (uint64_t)index * ACPI_PAGE_SIZE,
+                 physical_base + (uint64_t)index * ACPI_PAGE_SIZE,
+                 ACPI_PAGE_FLAG_WRITABLE);
+
+        if (!mapping_was_installed(
+                virtual_base + (uint64_t)index * ACPI_PAGE_SIZE,
+                physical_base + (uint64_t)index * ACPI_PAGE_SIZE)) {
+            while (index != 0) {
+                --index;
+                unmap_page(virtual_base + (uint64_t)index *
+                           ACPI_PAGE_SIZE);
+            }
+            release_slots(slot_start, page_count);
+            return UACPI_MAP_FAILED;
+        }
+    }
+
+    record->virtual_base = virtual_base;
+    record->page_count = page_count;
+    return (void *)(uintptr_t)(virtual_base + offset);
+}
+
+void uacpi_kernel_unmap(void *addr, uacpi_size len)
+{
+    uint64_t virtual_address = (uint64_t)(uintptr_t)addr;
+    uint64_t requested_length = (uint64_t)len;
+    uint64_t offset;
+    uint64_t mapped_length;
+    uint64_t page_count;
+    uint64_t virtual_base;
+    uint64_t slot_start;
+    uint32_t index;
+    struct acpi_mapping *record;
+
+    if (addr == 0 || addr == UACPI_MAP_FAILED || requested_length == 0)
+        return;
+
+    offset = virtual_address & (ACPI_PAGE_SIZE - 1ULL);
+    if (requested_length > ~(uint64_t)0 - offset)
+        return;
+    mapped_length = requested_length + offset;
+    if (mapped_length > ~(uint64_t)0 - (ACPI_PAGE_SIZE - 1ULL))
+        return;
+    mapped_length = (mapped_length + ACPI_PAGE_SIZE - 1ULL) &
+                    ~(ACPI_PAGE_SIZE - 1ULL);
+    page_count = mapped_length / ACPI_PAGE_SIZE;
+    virtual_base = virtual_address - offset;
+
+    if (virtual_base < ACPI_MAP_WINDOW_BASE ||
+        page_count == 0 ||
+        page_count > ACPI_MAP_WINDOW_PAGES ||
+        virtual_base > ACPI_MAP_WINDOW_BASE +
+                       (uint64_t)(ACPI_MAP_WINDOW_PAGES - page_count) *
+                           ACPI_PAGE_SIZE)
+        return;
+
+    record = find_mapping(virtual_base, page_count);
+    if (record == 0)
+        return;
+
+    slot_start = (virtual_base - ACPI_MAP_WINDOW_BASE) / ACPI_PAGE_SIZE;
+    for (index = 0; index < page_count; ++index)
+        unmap_page(virtual_base + (uint64_t)index * ACPI_PAGE_SIZE);
+
+    release_slots((uint32_t)slot_start, (uint32_t)page_count);
+    record->virtual_base = 0;
+    record->page_count = 0;
+}
+
+void uacpi_kernel_log(uacpi_log_level, const uacpi_char*) {    
+    print("[uACPI] ");
+    print("log message\n");
+}
