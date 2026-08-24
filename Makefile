@@ -39,10 +39,10 @@ bin/kernel/%.S.o: kernel/%.S
 
 kernel: $(KERNEL_OBJS)
 	@echo " LD kernel/*"
-	$(LD) $(LDFLAGS) $^ -o bin/kernel.elf
+	@$(LD) $(LDFLAGS) $^ -o bin/kernel.elf
 
 iso: kernel
-	@grub-file ./bin/kernel.elf; \
+	@grub-file --is-x86-multiboot ./bin/kernel.elf; \
 	if [ $$? -eq 1 ]; then \
 		echo " error: kernel.elf is not a valid multiboot file"; \
 		exit 1; \
