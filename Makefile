@@ -11,10 +11,10 @@ KERNEL_C_SOURCES = $(shell cd kernel && find -L * -type f -name '*.c')
 KERNEL_OBJS := $(addprefix bin/kernel/, $(KERNEL_S_SOURCES:.S=.S.o) $(KERNEL_C_SOURCES:.c=.c.o))
 
 # Flags
-ASFLAGS = -f elf32 -g -F dwarf
-CCFLAGS = -m32 -std=gnu11 -ffreestanding -Wall -Wextra -nostdlib -I kernel -fno-stack-protector -Wno-unused-parameter -fno-stack-check -fno-lto -mno-mmx -mno-80387 -mno-sse -mno-sse2 -mno-red-zone
+ASFLAGS = -f elf64 -g -F dwarf
+CCFLAGS = -m64 -std=gnu11 -ffreestanding -Wall -Wextra -nostdlib -I kernel -fno-stack-protector -Wno-unused-parameter -fno-stack-check -fno-lto -mno-mmx -mno-80387 -mno-sse -mno-sse2 -mno-red-zone -fno-pic -mcmodel=kernel
 QEMUFLAGS = -debugcon stdio -cdrom bin/$(IMAGE_NAME).iso -boot d
-LDFLAGS = -m elf_i386 -Tkernel/linker.ld -z noexecstack
+LDFLAGS = -m elf_x86_64 -Tkernel/linker.ld -z noexecstack
 
 # Output image name
 IMAGE_NAME = image
@@ -22,10 +22,10 @@ IMAGE_NAME = image
 all: boot kernel iso
 
 run: all
-	@qemu-system-i386 $(QEMUFLAGS)
+	@qemu-system-x86_64 $(QEMUFLAGS)
 
 run-gdb: all
-	@qemu-system-i386 $(QEMUFLAGS) -S -s
+	@qemu-system-x86_64 $(QEMUFLAGS) -S -s
 
 bin/kernel/%.c.o: kernel/%.c
 	@echo " CC $<"
@@ -42,7 +42,7 @@ kernel: $(KERNEL_OBJS)
 	@$(LD) $(LDFLAGS) $^ -o bin/kernel.elf
 
 iso: kernel
-	@grub-file --is-x86-multiboot ./bin/kernel.elf; \
+	@grub-file ./bin/kernel.elf; \
 	if [ $$? -eq 1 ]; then \
 		echo " error: kernel.elf is not a valid multiboot file"; \
 		exit 1; \
