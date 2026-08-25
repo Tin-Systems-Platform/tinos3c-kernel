@@ -26,12 +26,12 @@
 - [ ] Handle kernel panics gracefully
 
 ## Utility
-- [ ] Power management
-- [ ] ACPI integration
+- [X] Power management
+- [X] ACPI integration
 - [ ] Scheduler
 - [ ] Filesystem stuff
 
 
 ## Internal
 - [ ] Remove the "debug" console from the kernel
-- [ ] Port kernel to x86_64 long mode
+- [X] Port kernel to x86_64 long mode
