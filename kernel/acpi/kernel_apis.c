@@ -12,6 +12,7 @@
 #define ACPI_MAP_WINDOW_PAGES   16384U
 #define ACPI_MAP_RECORDS        256U
 #define ACPI_PAGE_FLAG_WRITABLE 0x002ULL
+#define ACPI_IDENTITY_MAP_LIMIT (1024ULL * 1024ULL * 1024ULL)
 
 struct acpi_mapping {
     uint64_t virtual_base;
@@ -119,28 +120,62 @@ void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len)
 {
     uint64_t physical_address = (uint64_t)addr;
     uint64_t requested_length = (uint64_t)len;
-    uint64_t offset = physical_address & 0xFFFULL;
+    uint64_t offset;
+    uint64_t mapped_length;
+    uint64_t page_count;
+    uint64_t physical_base;
+    uint32_t slot_start;
+    uint32_t index;
+    struct acpi_mapping *record;
 
     if (requested_length == 0)
         return UACPI_MAP_FAILED;
 
-    // Varmistetaan, että pyydetyt sivut on mapattu identiteettisesti
-    uint64_t phys_page = physical_address & ~0xFFFULL;
-    uint64_t end_phys = (physical_address + requested_length + 0xFFFULL) & ~0xFFFULL;
+    if (physical_address < ACPI_IDENTITY_MAP_LIMIT &&
+        requested_length <= ACPI_IDENTITY_MAP_LIMIT - physical_address)
+        return (void *)(uintptr_t)physical_address;
 
-    for (uint64_t p = phys_page; p < end_phys; p += 0x1000) {
-        // Mapataan fyysinen sivu identiteettisesti (virtuaaliosoite = fyysinen osoite)
-        // Tämä luo tarvittavat sivutaulut matalaan muistiin lennosta
-        map_page(p, p, 0x002ULL); // PAGE_FLAG_WRITABLE
-    }
-    void *lopullinen_osoite = (void *)(uintptr_t)physical_address;
-    if (lopullinen_osoite == NULL) {
-            print("\n[uACPI OSL] CRITICAL: uacpi_kernel_map(0x%x, %d) RETURNED NULL!\n");
-            print_uint64((uint64_t)addr);
-            print_int((int)len);
+    offset = physical_address & (ACPI_PAGE_SIZE - 1ULL);
+    if (requested_length > ~(uint64_t)0 - offset)
+        return UACPI_MAP_FAILED;
+    mapped_length = requested_length + offset;
+    if (mapped_length > ~(uint64_t)0 - (ACPI_PAGE_SIZE - 1ULL))
+        return UACPI_MAP_FAILED;
+    mapped_length = (mapped_length + ACPI_PAGE_SIZE - 1ULL) &
+                    ~(ACPI_PAGE_SIZE - 1ULL);
+    page_count = mapped_length / ACPI_PAGE_SIZE;
+    if (page_count == 0 || page_count > ACPI_MAP_WINDOW_PAGES)
+        return UACPI_MAP_FAILED;
+
+    record = reserve_mapping_record();
+    if (record == 0 || !reserve_slots((uint32_t)page_count, &slot_start))
+        return UACPI_MAP_FAILED;
+
+    physical_base = physical_address - offset;
+    for (index = 0; index < page_count; ++index) {
+        uint64_t virtual_page = ACPI_MAP_WINDOW_BASE +
+                                ((uint64_t)slot_start + index) *
+                                    ACPI_PAGE_SIZE;
+        uint64_t physical_page = physical_base +
+                                 (uint64_t)index * ACPI_PAGE_SIZE;
+
+        map_page(virtual_page, physical_page, ACPI_PAGE_FLAG_WRITABLE);
+        if (!mapping_was_installed(virtual_page, physical_page)) {
+            while (index != 0) {
+                --index;
+                unmap_page(ACPI_MAP_WINDOW_BASE +
+                           ((uint64_t)slot_start + index) * ACPI_PAGE_SIZE);
+            }
+            release_slots(slot_start, (uint32_t)page_count);
+            return UACPI_MAP_FAILED;
         }
+    }
 
-        return lopullinen_osoite;
+    record->virtual_base = ACPI_MAP_WINDOW_BASE +
+                           (uint64_t)slot_start * ACPI_PAGE_SIZE;
+    record->page_count = page_count;
+    return (void *)(uintptr_t)(record->virtual_base + offset);
+
 }
 
 
@@ -200,6 +235,7 @@ void uacpi_kernel_log(uacpi_log_level level, const uacpi_char *message) {
     
     // uACPI:n viestit eivät yleensä sisällä rivinvaihtoa lopussa, joten lisätään se varmuuden vuoksi
     print("\n"); 
+    scroll_screen();
 }
 
 typedef struct {
@@ -546,17 +582,24 @@ void *uacpi_kernel_alloc(uacpi_size size) {
         print("\n[uACPI OSL] CRITICAL: malloc(%d) returned NULL!\n");
         print_int((int)size);
     }
-    *ptr;
+    return ptr;
 }
 
 void uacpi_kernel_free(void *mem) {
     free(mem);
 }
 
+static inline uint64_t rdtsc(void);
+
 uint64_t time_get_ns(void) {
-    uacpi_u64 timer_ticks;
-    uacpi_u64 timer_frequency;
-    return 0;
+    static uint64_t start_ticks;
+    uint64_t ticks;
+
+    ticks = rdtsc();
+    if (start_ticks == 0)
+        start_ticks = ticks;
+
+    return (ticks - start_ticks) / 3ULL;
 }
 
 static inline uint64_t rdtsc(void)
@@ -596,17 +639,20 @@ void uacpi_kernel_sleep(uacpi_u64 msec)
 }
 
 typedef struct {
-    //spinlock_t lock;
+    uint8_t unused;
 } tinos_uacpi_mutex_t;
 
 uacpi_handle uacpi_kernel_create_mutex(void)
 {
-    return  UACPI_STATUS_OK;
+    tinos_uacpi_mutex_t *mutex =
+        uacpi_kernel_alloc(sizeof(*mutex));
+
+    return (uacpi_handle)mutex;
 }
 
 void uacpi_kernel_free_mutex(uacpi_handle handle)
 {
-    
+    uacpi_kernel_free(handle);
 }
 
 typedef struct {
