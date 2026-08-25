@@ -1,5 +1,6 @@
 #include "console.h"
 #include <drivers/keyboard/kb.h>
+#include "test_cmds/sleep.h"
 
 void console() {
     char buffer[128];
@@ -28,7 +29,12 @@ void console() {
             } else if (strcmp(buffer, "halt") == 0)
             {
                 while (1) asm volatile ("hlt");
-            } else {
+            } else if (strcmp(buffer,"poweroff"))
+            {
+                system_shutdown();
+            }
+            
+            else {
                 print("Unknown command: ");
                 print(buffer);
                 print("\n");
