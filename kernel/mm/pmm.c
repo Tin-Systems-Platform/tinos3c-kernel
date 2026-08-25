@@ -142,7 +142,7 @@ void pmm_reserve_region(uint64_t base, uint64_t length)
  */
 uint64_t pmm_alloc_page(void)
 {
-    for (uint64_t page = 0;
+    for (uint64_t page = 1;
          page < MAX_PAGES;
          page++)
     {
@@ -216,7 +216,7 @@ uint64_t pmm_get_total_pages(void)
 uint64_t pmm_alloc_page_low(void)
 {
     // 2048 sivua = tasan 8 MiB (olettaen että PMM_PAGE_SIZE on 4096)
-    for (uint64_t page = 0; page < 2048; page++)
+    for (uint64_t page = 1; page < 2048; page++)
     {
         if (!page_used(page))
         {

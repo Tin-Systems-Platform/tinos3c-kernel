@@ -43,7 +43,7 @@ int init_acpi(void) {
         return -ENODEV;
     }
 
-
+    scroll_screen();
     ret = uacpi_namespace_load();
     if (uacpi_unlikely_error(ret)) {
         //log_error("uacpi_namespace_load error: %s", uacpi_status_to_string(ret));
@@ -53,7 +53,7 @@ int init_acpi(void) {
         return -ENODEV;
     }
 
-  
+
     ret = uacpi_namespace_initialize();
     if (uacpi_unlikely_error(ret)) {
         //log_error("uacpi_namespace_initialize error: %s", uacpi_status_to_string(ret));
@@ -90,8 +90,6 @@ void _main(struct multiboot_info_t *mboot_info, uint32_t mboot_magic) {
     
     pmm_init();
 
-    scroll_screen();
-    scroll_screen();
 	uint8_t* mmap_start =
         (uint8_t*)(uintptr_t)mboot_info->mmap_addr;
 
@@ -140,6 +138,8 @@ void _main(struct multiboot_info_t *mboot_info, uint32_t mboot_magic) {
     print(" MB\n");
     scroll_screen();
 
+    scroll_screen();
+    scroll_screen();
     vmm_init();
    
 
