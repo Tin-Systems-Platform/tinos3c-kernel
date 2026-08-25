@@ -9,7 +9,7 @@
 #define PAGE_FLAG_PRESENT         0x001ULL
 #define PAGE_FLAG_WRITABLE        0x002ULL
 #define PAGE_FLAG_MASK            0xFFFULL
-#define BOOTSTRAP_IDENTITY_LIMIT  (256ULL * 1024ULL * 1024ULL)
+#define BOOTSTRAP_IDENTITY_LIMIT  (1024ULL * 1024ULL * 1024ULL)
 
 /* Accessed through the bootstrap identity map until a physical direct map exists. */
 static uint64_t initial_pml4[PAGE_ENTRIES] __attribute__((aligned(PAGE_SIZE)));
@@ -131,12 +131,6 @@ void paging_init(void)
                             0x083ULL; // Present + Writable + Page Size (0x80)
     }
 
-    // Päivitetään bootstrap-raja kattamaan koko gigatavu
-    #define BOOTSTRAP_IDENTITY_LIMIT (1024ULL * 1024ULL * 1024ULL)
-    
-    // Kerrotaan PMM:lle, että nämä sivut ovat kernelin käytössä
-    pmm_reserve_region(0, BOOTSTRAP_IDENTITY_LIMIT);
-    
     reload_page_directory();
     paging_enabled = 1;
     print("[PAGING] Massive 1 GiB Identity Map installed using 2 MiB Large Pages.\n");
