@@ -29,7 +29,7 @@ void console() {
             } else if (strcmp(buffer, "halt") == 0)
             {
                 while (1) asm volatile ("hlt");
-            } else if (strcmp(buffer,"poweroff"))
+            } else if (strcmp(buffer,"poweroff") == 0)
             {
                 system_shutdown();
             }

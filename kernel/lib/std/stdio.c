@@ -64,13 +64,20 @@ void putchar(char c) {
 void scroll_screen() {
     for (int y = 1; y < VGA_HEIGHT; y++) {
         for (int x = 0; x < VGA_WIDTH; x++) {
-            vga_buffer[(y - 1) * VGA_WIDTH + x] = vga_buffer[y * VGA_WIDTH + x];
+            vga_buffer[(y - 1) * VGA_WIDTH + x] =
+                vga_buffer[y * VGA_WIDTH + x];
         }
     }
 
     // Clear last line
     for (int x = 0; x < VGA_WIDTH; x++) {
-        vga_buffer[(VGA_HEIGHT - 1) * VGA_WIDTH + x] = vga_entry(' ', 0x07);
+        vga_buffer[(VGA_HEIGHT - 1) * VGA_WIDTH + x] =
+            vga_entry(' ', 0x07);
+    }
+
+    // Move cursor up with the screen
+    if (cursor_y > 0) {
+        cursor_y--;
     }
 }
 
