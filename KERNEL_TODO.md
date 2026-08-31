@@ -35,3 +35,15 @@
 ## Internal
 - [ ] Remove the "debug" console from the kernel
 - [X] Port kernel to x86_64 long mode
+
+
+## Userspace
+- [ ] Custom Userspace
+- [ ] Interracts with kernel features
+
+## Custom Scripting language for userspace
+
+Custom Programming language
+- [ ] Interpeted language
+- [ ] Stdlib working with the kernel stdlib
+- [ ] Allow kernel interaction for some parts and/or functions
