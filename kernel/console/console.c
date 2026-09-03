@@ -6,8 +6,8 @@ void console() {
     char buffer[128];
     int pos = 0;
 
-    print("This console is the Tinos3c kernel Debug Console.\n");
-    print(">");
+    printf("This console is the Tinos3c kernel Debug Console.\n");
+    printf(">");
 
     while (1) {
         char c = read_char();
@@ -22,10 +22,10 @@ void console() {
             }
         } else if (c == '\n') {
             buffer[pos] = '\0';
-            print("\n");
+            printf("\n");
 
             if (strcmp(buffer, "ver") == 0) {
-                print("Tinos3 C edition\n");
+                printf("Tinos3 C edition\n");
             } else if (strcmp(buffer, "halt") == 0)
             {
                 while (1) asm volatile ("hlt");
@@ -35,13 +35,11 @@ void console() {
             }
             
             else {
-                print("Unknown command: ");
-                print(buffer);
-                print("\n");
+                printf("Unknown command: %s\n", buffer);
             }
 
             scroll_screen();
-            print(">");
+            printf(">");
             pos = 0;
         } else if (pos < sizeof(buffer) - 1) {
             buffer[pos++] = c;

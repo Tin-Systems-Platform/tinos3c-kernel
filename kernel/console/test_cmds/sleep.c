@@ -19,8 +19,7 @@ int system_shutdown(void) {
      */
     uacpi_status ret = uacpi_enter_sleep_state_simple(UACPI_SLEEP_STATE_S5);
     if (uacpi_unlikely_error(ret)) {
-        print("failed to enter sleep: %s");
-        print(uacpi_status_to_string(ret));
+        printf("failed to enter sleep: %s", uacpi_status_to_string(ret));
         return -EIO;
     }
 

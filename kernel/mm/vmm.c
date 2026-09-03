@@ -100,9 +100,9 @@ static void reload_page_directory(void)
 
 void vmm_init(void)
 {
-    print("[VMM] Initializing x86_64 Virtual Memory Management subsystem...\n");
+    printf("[VMM] Initializing x86_64 Virtual Memory Management subsystem...\n");
     paging_init();
-    print("[VMM] subsystem initialized successfully.\n");
+    printf("[VMM] subsystem initialized successfully.\n");
 }
 
 /* Build a four-level identity map for the first 8 MiB. */
@@ -133,7 +133,7 @@ void paging_init(void)
 
     reload_page_directory();
     paging_enabled = 1;
-    print("[PAGING] Massive 1 GiB Identity Map installed using 2 MiB Large Pages.\n");
+    printf("[PAGING] Massive 1 GiB Identity Map installed using 2 MiB Large Pages.\n");
 }
 
 void map_page(uint64_t virtual_address, uint64_t physical_address,
@@ -232,9 +232,7 @@ void vmm_page_fault_handler(void)
 {
     uint64_t fault_address;
     asm volatile("mov %%cr2, %0" : "=r" (fault_address));
-    print("[VMM] Page fault at ");
-    print_hex(fault_address);
-    print("\n");
+    printf("[VMM] Page fault at %x\n", fault_address);
     asm volatile("cli");
     for (;;)
         asm volatile("hlt");

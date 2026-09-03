@@ -1,6 +1,7 @@
 #include <lib/std/stdio.h>
 #include <lib/std/stdint.h>
 #include <lib/scancodes.h>
+#include <stdarg.h>
 
 #include <drivers/keyboard/kb.h>
 
@@ -81,13 +82,6 @@ void scroll_screen() {
     }
 }
 
-//print string
-void print(const char* str) {
-    for (int i = 0; str[i] != '\0'; i++) {
-        putchar(str[i]);
-    }
-}
-
 //update cursor pos
 void update_cursor(int x, int y) {
     uint16_t pos = y * VGA_WIDTH + x;
@@ -154,62 +148,113 @@ char getchar() {
     return scancode_to_ascii(scancode);
 }
 
-void print_int(int num) {
-    char buf[16];
-    int i = 0;
 
-    if (num == 0) {
-        print("0");
-        return;
-    }
 
-    if (num < 0) {
-        print("-");
-        num = -num;
-    }
-
-    while (num > 0) {
-        buf[i++] = '0' + (num % 10);
-        num /= 10;
-    }
-
-    // reverse
-    for (int j = i - 1; j >= 0; j--) {
-        char c[2] = {buf[j], 0};
-        print(c);
-    }
-}
-
-void print_hex(uint64_t value)
+void printf(const char* fmt, ...)
 {
-    const char* hex = "0123456789ABCDEF";
+    va_list args;
+    va_start(args, fmt);
 
-    print("0x");
-
-    for (int i = 15; i >= 0; i--)
+    for (int i = 0; fmt[i] != '\0'; i++)
     {
-        putchar(hex[(value >> (i * 4)) & 0xF]);
+        if (fmt[i] != '%')
+        {
+            putchar(fmt[i]);
+            continue;
+        }
+
+        i++;
+
+        switch (fmt[i])
+        {
+            case '%':
+                putchar('%');
+                break;
+
+            case 's':
+            {
+                const char* str = va_arg(args, const char*);
+                while (*str)
+                    putchar(*str++);
+                break;
+            }
+
+            case 'd':
+            {
+                int num = va_arg(args, int);
+
+                if (num == 0)
+                {
+                    putchar('0');
+                    break;
+                }
+
+                if (num < 0)
+                {
+                    putchar('-');
+                    num = -num;
+                }
+
+                char buf[16];
+                int j = 0;
+
+                while (num > 0)
+                {
+                    buf[j++] = '0' + (num % 10);
+                    num /= 10;
+                }
+
+                while (j--)
+                    putchar(buf[j]);
+
+                break;
+            }
+
+            case 'u':
+            {
+                uint64_t num = va_arg(args, uint64_t);
+
+                if (num == 0)
+                {
+                    putchar('0');
+                    break;
+                }
+
+                char buf[21];
+                int j = 0;
+
+                while (num > 0)
+                {
+                    buf[j++] = '0' + (num % 10);
+                    num /= 10;
+                }
+
+                while (j--)
+                    putchar(buf[j]);
+
+                break;
+            }
+
+            case 'x':
+            {
+                uint64_t value = va_arg(args, uint64_t);
+                const char* hex = "0123456789ABCDEF";
+
+                putchar('0');
+                putchar('x');
+
+                for (int j = 15; j >= 0; j--)
+                    putchar(hex[(value >> (j * 4)) & 0xF]);
+
+                break;
+            }
+
+            default:
+                putchar('%');
+                putchar(fmt[i]);
+                break;
+        }
     }
-}
 
-void print_uint64(uint64_t value)
-{
-    char buffer[21];
-    int i = 20;
-
-    buffer[i] = '\0';
-
-    if (value == 0)
-    {
-        print("0");
-        return;
-    }
-
-    while (value > 0)
-    {
-        buffer[--i] = '0' + (value % 10);
-        value /= 10;
-    }
-
-    print(&buffer[i]);
+    va_end(args);
 }
