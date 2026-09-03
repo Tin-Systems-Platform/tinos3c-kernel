@@ -6,11 +6,13 @@
 #include <uacpi/utilities.h>
 #include <uacpi/event.h>
 
+//SUBSYSTEM INCLUDES
 #include <gdt/gdt.h>
 #include <idt/idt.h>
 #include <pic/pic.h>
 #include <mm/pmm.h>
 #include <mm/vmm.h>
+#include <drivers/pci/pci.h>
 
 #include <console/console.h>
 
@@ -24,9 +26,9 @@ struct multiboot_header_t mboot_header = {
 typedef struct multiboot_memory_map_t mmap_entry_t;
 
 void internal_panic(const char *message) {
-    print("[PANIC] ");
-    print(message);
-    print("\n");
+    printf("[PANIC] ");
+    printf(message);
+    printf("\n");
     while (1) {
         asm volatile("hlt");
     }
@@ -37,9 +39,7 @@ int init_acpi(void) {
     uacpi_status ret = uacpi_initialize(0);
     if (uacpi_unlikely_error(ret)) {
         //log_error("uacpi_initialize error: %s", uacpi_status_to_string(ret));
-        print("uacpi_initialize error: ");
-        print(uacpi_status_to_string(ret));
-        print("\n");
+        printf("uacpi_initialize error: %s\n", uacpi_status_to_string(ret));
         return -ENODEV;
     }
 
@@ -47,9 +47,7 @@ int init_acpi(void) {
     ret = uacpi_namespace_load();
     if (uacpi_unlikely_error(ret)) {
         //log_error("uacpi_namespace_load error: %s", uacpi_status_to_string(ret));
-        print("uacpi_namespace_load error: ");
-        print(uacpi_status_to_string(ret));
-        print("\n");
+        printf("uacpi_namespace_load error: %s\n", uacpi_status_to_string(ret));
         return -ENODEV;
     }
 
@@ -58,9 +56,7 @@ int init_acpi(void) {
     if (uacpi_unlikely_error(ret)) {
         //log_error("uacpi_namespace_initialize error: %s", uacpi_status_to_string(ret));
 
-        print("uacpi_namespace_initialize error: ");
-        print(uacpi_status_to_string(ret));
-        print("\n");
+        printf("uacpi_namespace_initialize error: %s\n", uacpi_status_to_string(ret));
         return -ENODEV;
     }
 
@@ -69,9 +65,7 @@ int init_acpi(void) {
     ret = uacpi_finalize_gpe_initialization();
     if (uacpi_unlikely_error(ret)) {
         //log_error("uACPI GPE initialization error: %s", uacpi_status_to_string(ret));
-        print("uACPI GPE initialization error: ");
-        print(uacpi_status_to_string(ret));
-        print("\n");
+        printf("uACPI GPE initialization error: %s\n", uacpi_status_to_string(ret));
         return -ENODEV;
     }
 
@@ -133,9 +127,7 @@ void _main(struct multiboot_info_t *mboot_info, uint32_t mboot_magic) {
     pmm_reserve_region(start, end - start);
 
     // Output the memory amount
-    print("Usable memory: ");
-    print_uint64(total_memory / (1024 * 1024));
-    print(" MB\n");
+    printf("Usable memory: %u bytes\n", total_memory / (1024 * 1024));
     scroll_screen();
 
     scroll_screen();
@@ -144,6 +136,9 @@ void _main(struct multiboot_info_t *mboot_info, uint32_t mboot_magic) {
    
 
     init_acpi();
+
+    pci_init();
+
     console();
     internal_panic("Kernel has panic due to something going wrong internally");
 }

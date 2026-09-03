@@ -11,7 +11,7 @@ void io_wait(void);
 void scroll_screen();
 void putchar(char c);
 
-void print(const char *str);
+void printf(const char *fmt, ...);
 void update_cursor(int x, int y);
 
 void clear_screen();
@@ -21,10 +21,7 @@ void scanf(char* buffer, size_t max_len);
 int strcmp(const char* s1, const char* s2);
 
 char getchar();
-void print_int(int num);
 
-void print_hex(uint64_t value);
-void print_uint64(uint64_t value);
 
 static inline void outl(uint16_t port, uint32_t value)
 {

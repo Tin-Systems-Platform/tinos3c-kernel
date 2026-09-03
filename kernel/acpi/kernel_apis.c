@@ -230,11 +230,10 @@ void uacpi_kernel_unmap(void *addr, uacpi_size len)
 
 void uacpi_kernel_log(uacpi_log_level level, const uacpi_char *message) {    
     // Voit myös halutessasi suodattaa tason mukaan (esim. jos level == UACPI_LOG_ERROR)
-    print("[uACPI] ");
-    print(message); // Tulostetaan uACPI:n oikea viesti "log message" -tekstin sijaan
+    printf("[uACPI] %s", message); // Tulostetaan uACPI:n oikea viesti "log message" -tekstin sijaan
     
     // uACPI:n viestit eivät yleensä sisällä rivinvaihtoa lopussa, joten lisätään se varmuuden vuoksi
-    print("\n"); 
+    printf("\n");
     scroll_screen();
 }
 
@@ -579,8 +578,7 @@ void *uacpi_kernel_alloc(uacpi_size size) {
     
     // Jos muisti loppuu, huudetaan täysillä!
     if (ptr == NULL) {
-        print("\n[uACPI OSL] CRITICAL: malloc(%d) returned NULL!\n");
-        print_int((int)size);
+        printf("\n[uACPI OSL] CRITICAL: malloc(%d) returned NULL!\n", (int)size);
     }
     return ptr;
 }
