@@ -1,6 +1,28 @@
 #include "console.h"
 #include <drivers/keyboard/kb.h>
 #include "test_cmds/sleep.h"
+#include <lib/std/stdio.h>
+#include <mm/pmm.h>
+
+static void show_memory_info(void) {
+
+    uint64_t free = pmm_get_free_pages();
+    uint64_t total = pmm_get_total_pages();
+    uint64_t used = total - free;
+    uint64_t free_mb = (free * 4096) / (1024 * 1024);
+    uint64_t total_mb = (total * 4096) / (1024 * 1024);
+    uint64_t used_mb = (used * 4096) / (1024 * 1024);
+    uint32_t usage_percent = (used * 100) / total;
+
+
+    printf("Memory Status:\n");
+    printf("  Total:  %u MiB (%u pages)\n", total_mb, total);
+    printf("  Used:   %u MiB (%u pages)\n", used_mb, used);
+    printf("  Free:   %u MiB (%u pages)\n", free_mb, free);
+    printf("  Usage:  %u%%\n", usage_percent);
+}
+
+
 
 void console() {
     char buffer[128];
@@ -33,7 +55,9 @@ void console() {
             {
                 system_shutdown();
             }
-            
+            else if (strcmp(buffer, "meminfo") == 0) {
+                show_memory_info();
+            }
             else {
                 printf("Unknown command: %s\n", buffer);
             }
