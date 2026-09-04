@@ -30,6 +30,23 @@ uint8_t kbd_pop() {
     return scancode;
 }
 
+char kbd_read_blocking() {
+    static const char scancode_table[128] = {
+        0,  27, '1','2','3','4','5','6','7','8','9','0','-','=', '\b',
+        '\t','q','w','e','r','t','y','u','i','o','p','[',']','\n', 0,
+        'a','s','d','f','g','h','j','k','l',';','\'','`', 0, '\\',
+        'z','x','c','v','b','n','m',',','.','/', 0, '*', 0, ' ',
+    };
+
+    while (kbd_head == kbd_tail) {
+        asm volatile("hlt");
+    }
+
+    uint8_t sc = kbd_pop();
+
+    return sc < 128 ? scancode_table[sc] : 0;
+}
+
 char read_char() {
     static const char scancode_table[128] = {
         0,  27, '1','2','3','4','5','6','7','8','9','0','-','=', '\b',
@@ -38,11 +55,9 @@ char read_char() {
         'z','x','c','v','b','n','m',',','.','/', 0, '*', 0, ' ',
     };
 
-    while ((inb(0x64) & 1) == 0);
+    uint8_t sc = kbd_pop();
 
-    uint8_t sc = inb(0x60);
-
-    if (sc & 0x80) return 0;
+    if (sc == 0) return 0;
 
     return sc < 128 ? scancode_table[sc] : 0;
 }
