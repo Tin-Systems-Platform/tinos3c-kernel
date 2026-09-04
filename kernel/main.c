@@ -92,9 +92,12 @@ void _main(struct multiboot_info_t *mboot_info, uint32_t mboot_magic) {
 
     mmap_entry_t* entry = (mmap_entry_t*)mmap_start;
 
+    printf("[BOOT] Memory map entries:\n");
+
     while ((uint8_t*)entry < mmap_end)
     {
-        if (entry->type == MULTIBOOT_MEMORY_AVAILABLE)
+        uint32_t type = entry->type;
+        if (type == MULTIBOOT_MEMORY_AVAILABLE)
         {
             uint64_t base =
                 ((uint64_t)entry->addr_high << 32) |
@@ -104,7 +107,15 @@ void _main(struct multiboot_info_t *mboot_info, uint32_t mboot_magic) {
                 ((uint64_t)entry->len_high << 32) |
                 entry->len_low;
 
-                total_memory += length;
+            total_memory += length;
+            printf("[MMAP] Base=");
+
+
+            printf("0x%x", base);
+            printf(" Len=");
+            printf("0x%x", length);
+            printf(" Type=");
+            printf("%u\n", type);
 
             pmm_add_region(base, length);
         }
@@ -127,17 +138,19 @@ void _main(struct multiboot_info_t *mboot_info, uint32_t mboot_magic) {
     pmm_reserve_region(start, end - start);
 
     // Output the memory amount
-    printf("Usable memory: %u bytes\n", total_memory / (1024 * 1024));
-    scroll_screen();
+    printf("Usable memory: %u MiB\n", total_memory / (1024 * 1024));
+    //scroll_screen();
 
-    scroll_screen();
-    scroll_screen();
+    //scroll_screen();
+    //scroll_screen();
     vmm_init();
    
 
-    init_acpi();
+    //init_acpi();
 
-    pci_init();
+    //pci_init();
+
+    printf("Usable memory: %u MiB\n", total_memory / (1024 * 1024));
 
     console();
     internal_panic("Kernel has panic due to something going wrong internally");
