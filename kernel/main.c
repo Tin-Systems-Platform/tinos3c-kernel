@@ -77,6 +77,7 @@ void _main(struct multiboot_info_t *mboot_info, uint32_t mboot_magic) {
     init_idt();
 
     pic_remap(0x20, 0x28); // Remap PIC:
+    serial_init(); // Debugging via serial
 
     asm volatile("sti"); // Enable interrupts after PIC remapping
 
@@ -150,7 +151,7 @@ void _main(struct multiboot_info_t *mboot_info, uint32_t mboot_magic) {
 
     //pci_init();
 
-    printf("Usable memory: %u MiB\n", total_memory / (1024 * 1024));
+    //printf("Usable memory: %u MiB\n", total_memory / (1024 * 1024));
 
     console();
     internal_panic("Kernel has panic due to something going wrong internally");

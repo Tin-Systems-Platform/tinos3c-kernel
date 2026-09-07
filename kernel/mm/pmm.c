@@ -80,8 +80,16 @@ void pmm_add_region(uint64_t base, uint64_t length)
     end = (base + length)
         & ~(PMM_PAGE_SIZE - 1);
 
+        uint64_t pages_before = free_pages;
+
     if (end <= start)
+        printf("[PMM] Skipping region (end <= start)\n");
         return;
+
+    uint64_t pages_to_add = (end - start) / PMM_PAGE_SIZE;
+
+    printf("[PMM] pages_to_add: ");
+    printf("%u\n", pages_to_add);
 
     for (uint64_t address = start;
          address < end;
@@ -90,13 +98,21 @@ void pmm_add_region(uint64_t base, uint64_t length)
         uint64_t page = address / PMM_PAGE_SIZE;
 
         if (page >= MAX_PAGES)
+        {
+            printf("[PMM] Breaking at page ");
+            printf("%u", page);
+            printf(" (>= MAX_PAGES)\n");
             break;
+        }
 
         if (page_used(page))
         {
             clear_page(page);
             free_pages++;
         }
+        printf("[PMM] Added region with ");
+        printf("%u", free_pages - pages_before);
+        printf(" pages\n");
     }
 }
 
