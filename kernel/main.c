@@ -135,10 +135,7 @@ void _main(struct multiboot_info_t *mboot_info, uint32_t mboot_magic) {
 
     // Output the memory amount
     printf("Usable memory: %u MiB\n", total_memory / (1024 * 1024));
-    //scroll_screen();
 
-    //scroll_screen();
-    //scroll_screen();
     vmm_init();
    
 
