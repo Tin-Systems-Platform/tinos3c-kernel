@@ -14,6 +14,10 @@
 #include <mm/vmm.h>
 #include <drivers/pci/pci.h>
 
+
+//INTERNAL SYSLIB INCLUDES
+#include <lib/sys/panic.h>
+
 #include <console/console.h>
 
 __attribute__((section(".multiboot")))
@@ -24,15 +28,6 @@ struct multiboot_header_t mboot_header = {
 };
 
 typedef struct multiboot_memory_map_t mmap_entry_t;
-
-void internal_panic(const char *message) {
-    printf("[PANIC] ");
-    printf(message);
-    printf("\n");
-    while (1) {
-        asm volatile("hlt");
-    }
-}
 
 int init_acpi(void) {
 
@@ -154,5 +149,5 @@ void _main(struct multiboot_info_t *mboot_info, uint32_t mboot_magic) {
     //printf("Usable memory: %u MiB\n", total_memory / (1024 * 1024));
 
     console();
-    internal_panic("Kernel has panic due to something going wrong internally");
+    panic("Kernel has panic due to something going wrong internally", "DEBUG_CONSOLE_EXITED");
 }

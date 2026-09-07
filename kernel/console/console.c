@@ -3,6 +3,8 @@
 #include "test_cmds/sleep.h"
 #include <lib/std/stdio.h>
 #include <mm/pmm.h>
+#include <lib/sys/panic.h>
+#include "test_cmds/crash.h"
 
 static void show_memory_info(void) {
 
@@ -77,6 +79,9 @@ void console() {
             }
             else if (strcmp(buffer, "meminfo") == 0) {
                 show_memory_info();
+            }
+            else if (strcmp(buffer, "crash") == 0) {
+                crash();
             }
             else {
                 printf("Unknown command: %s\n", buffer);
