@@ -40,35 +40,3 @@ static void pci_scan(
      */
 }
 
-void pci_init(void)
-{
-    for (uint16_t bus = 0; bus < 256; bus++) {
-        for (uint8_t device = 0; device < 32; device++) {
-
-            uint16_t vendor =
-                pci_config_read16(bus, device, 0, 0x00);
-
-            if (vendor == 0xFFFF)
-                continue;
-
-            uint8_t header =
-                pci_config_read8(bus, device, 0, 0x0E);
-
-            uint8_t functions =
-                (header & 0x80) ? 8 : 1;
-
-            for (uint8_t function = 0;
-                 function < functions;
-                 function++) {
-
-                pci_scan(
-                    bus,
-                    device,
-                    function
-                );
-            }
-        }
-    }
-
-    
-}
