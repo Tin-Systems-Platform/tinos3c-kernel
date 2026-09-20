@@ -12,12 +12,6 @@ static void show_memory_info(void) {
     uint64_t total = pmm_get_total_pages();
     uint64_t used = total - free;
 
-    printf("[DEBUG] free_pages=");
-    printf("%u", free);
-    printf(" total_pages=");
-    printf("%u", total);
-    printf("\n");
-
     uint64_t free_mb = (free * 4096) / (1024 * 1024);
     uint64_t total_mb = (total * 4096) / (1024 * 1024);
     uint64_t used_mb = (used * 4096) / (1024 * 1024);
