@@ -68,23 +68,25 @@ void console() {
             buffer[pos] = '\0';
             printf("\n");
 
-            if (strcmp(buffer, "ver") == 0) {
-                printf("Tinos3 C edition\n");
-            } else if (strcmp(buffer, "halt") == 0)
-            {
-                while (1) asm volatile ("hlt");
-            } else if (strcmp(buffer,"poweroff") == 0)
-            {
-                system_shutdown();
-            }
-            else if (strcmp(buffer, "meminfo") == 0) {
-                show_memory_info();
-            }
-            else if (strcmp(buffer, "crash") == 0) {
-                crash();
-            }
-            else {
-                printf("Unknown command: %s\n", buffer);
+            if (pos > 0) {
+                if (strcmp(buffer, "ver") == 0) {
+                    printf("Tinos3 C edition\n");
+                } else if (strcmp(buffer, "halt") == 0)
+                {
+                    while (1) asm volatile ("hlt");
+                } else if (strcmp(buffer,"poweroff") == 0)
+                {
+                    system_shutdown();
+                }
+                else if (strcmp(buffer, "meminfo") == 0) {
+                    show_memory_info();
+                }
+                else if (strcmp(buffer, "crash") == 0) {
+                    crash();
+                }
+                else {
+                    printf("Unknown command: %s\n", buffer);
+                }
             }
 
             scroll_screen();
