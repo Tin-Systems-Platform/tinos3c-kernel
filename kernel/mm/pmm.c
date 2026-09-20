@@ -54,7 +54,7 @@ void pmm_init(void)
     for (uint64_t i = 0; i < BITMAP_SIZE; i++)
         bitmap[i] = 0xFF;
 
-    total_pages = MAX_PAGES;
+    total_pages = 0;
     free_pages = 0;
     printf("[PMM] Physical Memory Manager initialized.\n");
 }
@@ -67,21 +67,18 @@ void pmm_add_region(uint64_t base, uint64_t length)
 {
     uint64_t start;
     uint64_t end;
+    uint64_t pages_before = free_pages;
 
-    /*
-     * Align the beginning upwards.
-     */
     start = (base + PMM_PAGE_SIZE - 1)
           & ~(PMM_PAGE_SIZE - 1);
 
-    /*
-     * Align the end downwards.
-     */
     end = (base + length)
         & ~(PMM_PAGE_SIZE - 1);
 
-    if (end <= start)
+    if (end <= start) {
+        printf("[PMM] Skipping region (end <= start)\n");
         return;
+    }
 
     for (uint64_t address = start;
          address < end;
@@ -89,15 +86,23 @@ void pmm_add_region(uint64_t base, uint64_t length)
     {
         uint64_t page = address / PMM_PAGE_SIZE;
 
-        if (page >= MAX_PAGES)
+        if (page >= MAX_PAGES) {
+            printf("[PMM] Breaking at page ");
+            printf("%u", page);
+            printf(" (>= MAX_PAGES)\n");
             break;
+        }
 
-        if (page_used(page))
-        {
+        if (page_used(page)) {
             clear_page(page);
+            total_pages++;
             free_pages++;
         }
     }
+
+    printf("[PMM] Added region with ");
+    printf("%u", free_pages - pages_before);
+    printf(" pages\n");
 }
 
 

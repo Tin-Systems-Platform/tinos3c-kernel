@@ -92,5 +92,6 @@ void pci_config_write16(
     uint16_t value
 );
 
+void scan_pci_devices();
 
 #endif // PCI_H

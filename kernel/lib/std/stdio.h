@@ -44,4 +44,8 @@ static inline uint32_t inl(uint16_t port)
 
     return value;
 }
+
+// Serial helpers exposed for early boot debugging
+void serial_init(void);
+void serial_putc(char c);
 #endif

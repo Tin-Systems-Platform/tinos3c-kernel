@@ -231,10 +231,10 @@ void uacpi_kernel_unmap(void *addr, uacpi_size len)
 void uacpi_kernel_log(uacpi_log_level level, const uacpi_char *message) {    
     // Voit myös halutessasi suodattaa tason mukaan (esim. jos level == UACPI_LOG_ERROR)
     printf("[uACPI] %s", message); // Tulostetaan uACPI:n oikea viesti "log message" -tekstin sijaan
-    
+    scroll_screen();
+    scroll_screen();
     // uACPI:n viestit eivät yleensä sisällä rivinvaihtoa lopussa, joten lisätään se varmuuden vuoksi
     printf("\n");
-    scroll_screen();
 }
 
 typedef struct {
