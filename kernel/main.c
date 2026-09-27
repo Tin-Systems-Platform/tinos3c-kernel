@@ -14,6 +14,10 @@
 #include <mm/vmm.h>
 #include <drivers/pci/pci.h>
 
+
+//INTERNAL SYSLIB INCLUDES
+#include <lib/sys/panic.h>
+
 #include <console/console.h>
 
 __attribute__((section(".multiboot")))
@@ -24,15 +28,6 @@ struct multiboot_header_t mboot_header = {
 };
 
 typedef struct multiboot_memory_map_t mmap_entry_t;
-
-void internal_panic(const char *message) {
-    printf("[PANIC] ");
-    printf(message);
-    printf("\n");
-    while (1) {
-        asm volatile("hlt");
-    }
-}
 
 int init_acpi(void) {
 
@@ -77,6 +72,7 @@ void _main(struct multiboot_info_t *mboot_info, uint32_t mboot_magic) {
     init_idt();
 
     pic_remap(0x20, 0x28); // Remap PIC:
+    serial_init(); // Debugging via serial
 
     asm volatile("sti"); // Enable interrupts after PIC remapping
 
@@ -92,9 +88,12 @@ void _main(struct multiboot_info_t *mboot_info, uint32_t mboot_magic) {
 
     mmap_entry_t* entry = (mmap_entry_t*)mmap_start;
 
+    printf("[BOOT] Memory map entries:\n");
+
     while ((uint8_t*)entry < mmap_end)
     {
-        if (entry->type == MULTIBOOT_MEMORY_AVAILABLE)
+        uint32_t type = entry->type;
+        if (type == MULTIBOOT_MEMORY_AVAILABLE)
         {
             uint64_t base =
                 ((uint64_t)entry->addr_high << 32) |
@@ -104,7 +103,15 @@ void _main(struct multiboot_info_t *mboot_info, uint32_t mboot_magic) {
                 ((uint64_t)entry->len_high << 32) |
                 entry->len_low;
 
-                total_memory += length;
+            total_memory += length;
+            printf("[MMAP] Base=");
+
+
+            printf("0x%x", base);
+            printf(" Len=");
+            printf("0x%x", length);
+            printf(" Type=");
+            printf("%u\n", type);
 
             pmm_add_region(base, length);
         }
@@ -127,11 +134,8 @@ void _main(struct multiboot_info_t *mboot_info, uint32_t mboot_magic) {
     pmm_reserve_region(start, end - start);
 
     // Output the memory amount
-    printf("Usable memory: %u bytes\n", total_memory / (1024 * 1024));
-    scroll_screen();
+    printf("Usable memory: %u MiB\n", total_memory / (1024 * 1024));
 
-    scroll_screen();
-    scroll_screen();
     vmm_init();
    
 
@@ -139,6 +143,8 @@ void _main(struct multiboot_info_t *mboot_info, uint32_t mboot_magic) {
 
     pci_init();
 
+    //printf("Usable memory: %u MiB\n", total_memory / (1024 * 1024));
+
     console();
-    internal_panic("Kernel has panic due to something going wrong internally");
+    panic("Kernel has panic due to something going wrong internally", "DEBUG_CONSOLE_EXITED");
 }
