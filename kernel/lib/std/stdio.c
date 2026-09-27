@@ -278,8 +278,18 @@ void printf(const char* fmt, ...)
                 putchar('0');
                 putchar('x');
 
+                int started = 0;
+
                 for (int j = 15; j >= 0; j--)
-                    putchar(hex[(value >> (j * 4)) & 0xF]);
+                {
+                    uint8_t digit = (value >> (j * 4)) & 0xF;
+
+                    if (digit != 0 || started || j == 0)
+                    {
+                        putchar(hex[digit]);
+                        started = 1;
+                    }
+                }
 
                 break;
             }

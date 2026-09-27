@@ -1,6 +1,6 @@
 #include "pci.h"
 #include "pci_classes.h"
-#include <lib/std/stdio.h>
+#include "../../lib/std/stdio.h"
 
 static void pci_scan(
     uint8_t bus,
@@ -30,6 +30,20 @@ static void pci_scan(
     uint8_t header =
         pci_config_read8(bus, device, function, 0x0E);
 
+    if (class_code != 0x01)
+        return;
+
+    printf(
+    "PCI: Mass storage device %02x:%02x.%u "
+    "vendor=%04x device=%04x subclass=%02x prog_if=%02x\n",
+    bus,
+    device,
+    function,
+    vendor,
+    device_id,
+    subclass,
+    prog_if
+);
 }
 
 void pci_init(void)
