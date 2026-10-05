@@ -94,4 +94,6 @@ void pci_config_write16(
 
 void scan_pci_devices();
 
+void pci_read_bars(pci_device_t *dev);
+
 #endif // PCI_H

@@ -3,9 +3,11 @@
 #include <lib/std/stdio.h>
 
 
-/*
- * Scan PCI Devices and register them to the driver and by extension to the whole os to use
+/**
+ * @brief Read BARs from the device.
+ * @author randomusert
+ * @copyright 2026 Tin Systems Platform. Licensed under the TINOS license 1.2
  */
-void scan_pci_devices() {
+void pci_read_bars(pci_device_t *dev) {
 
 }

@@ -79,3 +79,6 @@ HOSTCC := gcc
 compileTool:
 	@echo "HOSTCC tools/BuildAndRun.c"
 	@$(HOSTCC) tools/BuildAndRun.c -o BuildAndRun -lncurses
+
+genDocs:
+	@doxygen Doxyfile

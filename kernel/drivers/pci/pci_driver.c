@@ -2,49 +2,59 @@
 #include "pci_classes.h"
 #include "../../lib/std/stdio.h"
 
+
 static void pci_scan(
     uint8_t bus,
     uint8_t device,
     uint8_t function
 ) {
-    uint16_t vendor = pci_config_read16(bus, device, function, 0x00);
+    uint16_t vendor =
+        pci_config_read16(bus, device, function, 0x00);
 
     if (vendor == 0xFFFF)
         return;
 
-    uint16_t device_id =
-        pci_config_read16(bus, device, function, 0x02);
+    pci_device_t dev = {
+        .bus = bus,
+        .device = device,
+        .function = function,
 
-    uint8_t revision =
-        pci_config_read8(bus, device, function, 0x08);
+        .vendor_id = vendor,
+        .device_id =
+            pci_config_read16(bus, device, function, 0x02),
 
-    uint8_t prog_if =
-        pci_config_read8(bus, device, function, 0x09);
+        .revision =
+            pci_config_read8(bus, device, function, 0x08),
 
-    uint8_t subclass =
-        pci_config_read8(bus, device, function, 0x0A);
+        .prog_if =
+            pci_config_read8(bus, device, function, 0x09),
 
-    uint8_t class_code =
-        pci_config_read8(bus, device, function, 0x0B);
+        .subclass =
+            pci_config_read8(bus, device, function, 0x0A),
 
-    uint8_t header =
-        pci_config_read8(bus, device, function, 0x0E);
+        .class_code =
+            pci_config_read8(bus, device, function, 0x0B),
 
-    if (class_code != 0x01)
-        return;
+        .header_type =
+            pci_config_read8(bus, device, function, 0x0E),
+    };
 
-    printf(
-    "PCI: Mass storage device %02x:%02x.%u "
-    "vendor=%04x device=%04x subclass=%02x prog_if=%02x\n",
-    bus,
-    device,
-    function,
-    vendor,
-    device_id,
-    subclass,
-    prog_if
-);
+    if (dev.class_code == PCI_MASS_STORAGE_CONTROLLER) {
+        printf(
+            "PCI: Mass storage %02x:%02x.%u "
+            "vendor=%04x device=%04x subclass=%02x prog_if=%02x\n",
+            dev.bus,
+            dev.device,
+            dev.function,
+            dev.vendor_id,
+            dev.device_id,
+            dev.subclass,
+            dev.prog_if
+        );
+
+    }
 }
+
 
 void pci_init(void)
 {
