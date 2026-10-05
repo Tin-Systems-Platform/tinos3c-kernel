@@ -2,19 +2,21 @@
 #include <stdlib.h>  // For system() function
 #include <string.h>  // For strlen() function
 
-#define NUM_TASKS 3
+#define NUM_TASKS 4
 
 // List of tasks to choose from
 const char *tasks[NUM_TASKS] = {
     "1. Build OS",
     "2. Run OS",
-    "3. Exit"
+    "3. Build Docs",
+    "4. Exit"
 };
 
 // Corresponding commands for each task
 const char *commands[NUM_TASKS] = {
     "make build",
     "make run",  // Run the OS
+    "make genDocs",
     ""  // Exit (no command needed)
 };
 

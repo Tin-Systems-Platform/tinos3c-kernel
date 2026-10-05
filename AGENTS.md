@@ -15,6 +15,7 @@ Most kernel source code is located in the `kernel/` directory.
 - `kernel/lib`: Internal kernel library code and the custom C standard library implementation.
 - `kernel/mm`: Physical and virtual memory management.
 - `kernel/pic`: Programmable Interrupt Controller (PIC) related code.
+- `kernel/fs`: Virtual Filesystem (VFS) Implementation
 
 ## Kernel Development Rules
 
