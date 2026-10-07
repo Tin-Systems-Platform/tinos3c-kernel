@@ -72,7 +72,8 @@ iso: kernel
 
 clean:
 	@rm -f $(BOOT_OBJS) $(KERNEL_OBJS)
-	@rm -rf bin
+	@rm -rf bin latex html
+	@rm -f BuildAndRun
 
 HOSTCC := gcc
 
