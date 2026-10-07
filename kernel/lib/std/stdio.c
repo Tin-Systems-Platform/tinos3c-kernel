@@ -29,10 +29,11 @@ void io_wait(void) {
 
 #define DEFAULT_COLOR 0x07
 
-volatile uint16_t* vga_buffer = (uint16_t*)0xB8000;
+volatile uint16_t* vga_buffer __attribute__((section(".data.boot"))) =
+    (uint16_t*)0xB8000;
 
-int cursor_x = 0;
-int cursor_y = 0;
+int cursor_x __attribute__((section(".data.boot")));
+int cursor_y __attribute__((section(".data.boot")));
 
 // simple serial (COM1) helpers so kernel prints appear under -nographic
 void serial_init(void) {
@@ -59,7 +60,7 @@ void serial_putc(char c) {
 
 // put 1 charapter on the screen
 void putchar(char c) {
-    static int serial_ready = 0;
+    static int serial_ready __attribute__((section(".data.boot")));
     if (!serial_ready) {
         serial_init();
         serial_ready = 1;

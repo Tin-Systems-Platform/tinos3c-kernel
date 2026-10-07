@@ -1,8 +1,8 @@
 #include <lib/std/stdint.h>
 #include "gdt.h"
 
-gdt_entry_t gdt[3] __attribute__((aligned(16)));
-gdt_ptr_t gdt_p; 
+gdt_entry_t gdt[3] __attribute__((aligned(16), section(".data")));
+gdt_ptr_t gdt_p __attribute__((section(".data")));
 
 extern void gdt_flush(const gdt_ptr_t *gdt_ptr_addr);
 

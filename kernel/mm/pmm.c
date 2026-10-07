@@ -10,10 +10,11 @@
 #define MAX_PAGES (MAX_PHYSICAL_MEMORY / PMM_PAGE_SIZE)
 #define BITMAP_SIZE ((MAX_PAGES + 7) / 8)
 
-static uint8_t bitmap[BITMAP_SIZE];
+static uint8_t bitmap[BITMAP_SIZE]
+    __attribute__((section(".data.boot")));
 
-static uint64_t total_pages = 0;
-static uint64_t free_pages = 0;
+static uint64_t total_pages __attribute__((section(".data.boot")));
+static uint64_t free_pages __attribute__((section(".data.boot")));
 
 
 /*
