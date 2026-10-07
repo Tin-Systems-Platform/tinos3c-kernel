@@ -16,8 +16,8 @@ KERNEL_S_SOURCES = $(shell cd kernel && find -L * -type f -name '*.S')
 KERNEL_C_SOURCES = $(shell cd kernel && find -L * -type f -name '*.c')
 
 # internal modules
-INTERNAL_DEPS_C_SOURCES = $(shell cd internel && find -L * -type f -name "*.c")
-INTERNAL_DEPS_S_SOURCES = $(shell cd internel && find -L * -type f -name "*.S")
+INTERNAL_DEPS_C_SOURCES = $(shell cd internal && find -L * -type f -name "*.c")
+INTERNAL_DEPS_S_SOURCES = $(shell cd internal && find -L * -type f -name "*.S")
 
 # Get object files
 KERNEL_OBJS := $(addprefix bin/kernel/, $(KERNEL_S_SOURCES:.S=.S.o) $(KERNEL_C_SOURCES:.c=.c.o))
