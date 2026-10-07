@@ -23,7 +23,7 @@ void io_wait(void) {
 
 // VGA stuff
 #define VGA_WIDTH 80
-#define VGA_HEIGHT 60
+#define VGA_HEIGHT 25
 
 #define VGA_MEMORY ((unsigned short*)0xb8000)
 
@@ -66,6 +66,16 @@ void putchar(char c) {
         serial_ready = 1;
     }
 
+    if (cursor_x >= VGA_WIDTH) {
+        cursor_x = 0;
+        cursor_y++;
+    }
+
+    while (cursor_y >= VGA_HEIGHT) {
+        scroll_screen();
+        cursor_y = VGA_HEIGHT - 1;
+    }
+
     if (c == '\n') {
         cursor_x = 0;
         cursor_y++;
@@ -83,7 +93,7 @@ void putchar(char c) {
         }
     }
 
-    if (cursor_y >= VGA_HEIGHT) {
+    while (cursor_y >= VGA_HEIGHT) {
         scroll_screen();
         cursor_y = VGA_HEIGHT - 1;
     }
@@ -112,10 +122,6 @@ void scroll_screen() {
             vga_entry(' ', 0x07);
     }
 
-    // Move cursor up with the screen
-    if (cursor_y > 0) {
-        cursor_y--;
-    }
 }
 
 //update cursor pos
