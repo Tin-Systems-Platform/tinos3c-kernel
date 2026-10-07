@@ -12,11 +12,15 @@
 #define BOOTSTRAP_IDENTITY_LIMIT  (1024ULL * 1024ULL * 1024ULL)
 
 /* Accessed through the bootstrap identity map until a physical direct map exists. */
-static uint64_t initial_pml4[PAGE_ENTRIES] __attribute__((aligned(PAGE_SIZE)));
-static uint64_t initial_pdpt[PAGE_ENTRIES] __attribute__((aligned(PAGE_SIZE)));
-static uint64_t initial_pd[PAGE_ENTRIES] __attribute__((aligned(PAGE_SIZE)));
-static uint64_t initial_pt[128][PAGE_ENTRIES] __attribute__((aligned(PAGE_SIZE)));
-static int paging_enabled;
+static uint64_t initial_pml4[PAGE_ENTRIES]
+    __attribute__((aligned(PAGE_SIZE), section(".data.boot")));
+static uint64_t initial_pdpt[PAGE_ENTRIES]
+    __attribute__((aligned(PAGE_SIZE), section(".data.boot")));
+static uint64_t initial_pd[PAGE_ENTRIES]
+    __attribute__((aligned(PAGE_SIZE), section(".data.boot")));
+static uint64_t initial_pt[128][PAGE_ENTRIES]
+    __attribute__((aligned(PAGE_SIZE), section(".data.boot")));
+static int paging_enabled __attribute__((section(".data.boot")));
 
 static int page_aligned_address(uint64_t address)
 {

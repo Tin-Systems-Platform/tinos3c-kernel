@@ -5,8 +5,8 @@ extern void isr0();
 extern void isr1();
 extern void isr14();
 
-idt_entry_t idt[256] __attribute__((aligned(16)));
-idt_ptr_t idt_p;
+idt_entry_t idt[256] __attribute__((aligned(16), section(".data")));
+idt_ptr_t idt_p __attribute__((section(".data")));
 
 extern void idt_flush(const idt_ptr_t *idt_ptr_addr);
 

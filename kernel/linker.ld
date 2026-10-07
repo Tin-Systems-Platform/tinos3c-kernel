@@ -20,11 +20,8 @@ SECTIONS
 
     .data ALIGN(4K) :
     {
+        *(.data.boot)
         *(.data)
-    }
-
-    .bss ALIGN(4K) :
-    {
         *(COMMON)
         *(.bss)
     }
