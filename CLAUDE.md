@@ -30,8 +30,8 @@ Most kernel source code is located in the `kernel/` directory.
 - Everything memory related MUST be safe and validate pointers if those places need doing so.
 
 # Documentation
-All new functions, public APIs, and significant internal functions must include Doxygen documentation when introduced. 
+All new functions, public APIs, and significant internal functions must include Doxygen documentation when introduced.
 
-Documentation should describe the function's purpose, parameters, return value, and relevant side effects/errors where applicable. 
+Documentation should describe the function's purpose, parameters, return value, and relevant side effects/errors where applicable.
 
 Also add a @copyright notice for the LICENSE.md in the root of the folder as well as a @date for giving the date of implementation for ALL new functions.
