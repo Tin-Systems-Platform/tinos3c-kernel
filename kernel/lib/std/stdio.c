@@ -29,13 +29,43 @@ void io_wait(void) {
 
 #define DEFAULT_COLOR 0x07
 
-volatile uint16_t* vga_buffer = (uint16_t*)0xB8000;
+volatile uint16_t* vga_buffer __attribute__((section(".data.boot"))) =
+    (uint16_t*)0xB8000;
 
-int cursor_x = 0;
-int cursor_y = 0;
+int cursor_x __attribute__((section(".data.boot")));
+int cursor_y __attribute__((section(".data.boot")));
+
+// simple serial (COM1) helpers so kernel prints appear under -nographic
+void serial_init(void) {
+    // Disable interrupts
+    outb(0x3F8 + 1, 0x00);
+    // Enable DLAB
+    outb(0x3F8 + 3, 0x80);
+    // Set divisor to 3 (38400 baud)
+    outb(0x3F8 + 0, 0x03);
+    outb(0x3F8 + 1, 0x00);
+    // 8 bits, no parity, one stop bit
+    outb(0x3F8 + 3, 0x03);
+    // Enable FIFO, clear them, with 14-byte threshold
+    outb(0x3F8 + 2, 0xC7);
+    // IRQs enabled, RTS/DSR set
+    outb(0x3F8 + 4, 0x0B);
+}
+
+void serial_putc(char c) {
+    // Wait for Transmitter Holding Register empty
+    while ((inb(0x3F8 + 5) & 0x20) == 0);
+    outb(0x3F8, (uint8_t)c);
+}
 
 // put 1 charapter on the screen
 void putchar(char c) {
+    static int serial_ready __attribute__((section(".data.boot")));
+    if (!serial_ready) {
+        serial_init();
+        serial_ready = 1;
+    }
+
     if (c == '\n') {
         cursor_x = 0;
         cursor_y++;
@@ -59,6 +89,12 @@ void putchar(char c) {
     }
 
     update_cursor(cursor_x, cursor_y);
+
+    // Mirror output to serial so -nographic and -serial stdio see it
+    if (c == '\n') {
+        serial_putc('\r');
+    }
+    serial_putc(c);
 }
 
 //scroll screen one line up
@@ -243,8 +279,18 @@ void printf(const char* fmt, ...)
                 putchar('0');
                 putchar('x');
 
+                int started = 0;
+
                 for (int j = 15; j >= 0; j--)
-                    putchar(hex[(value >> (j * 4)) & 0xF]);
+                {
+                    uint8_t digit = (value >> (j * 4)) & 0xF;
+
+                    if (digit != 0 || started || j == 0)
+                    {
+                        putchar(hex[digit]);
+                        started = 1;
+                    }
+                }
 
                 break;
             }
