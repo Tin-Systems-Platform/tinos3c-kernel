@@ -6,6 +6,7 @@
 
 //Function declarations
 void blkdev_init(void);
+void enable_interupts_blockdev(void);
 
 
 // Structs
