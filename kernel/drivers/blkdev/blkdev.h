@@ -1,8 +1,14 @@
 #ifndef BLKDEV_H
 #define BLKDEV_H
 
+//Includes
 #include <lib/std/stdint.h>
 
+//Function declarations
+void blkdev_init(void);
+
+
+// Structs
 struct block_device_ops {
     int (*read_sector)(struct block_device *bdev, uint64_t lba, void *buf);
     int (*write_sector)(struct block_device *bdev, uint64_t lba, void *buf);
