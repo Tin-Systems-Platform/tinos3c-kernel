@@ -145,9 +145,9 @@ void _main(struct multiboot_info_t *mboot_info, uint32_t mboot_magic) {
 
     pci_init();
 
-    ahci_init();
-
     blkdev_init();
+
+    ahci_init();
     //printf("Usable memory: %u MiB\n", total_memory / (1024 * 1024));
 
     console();
