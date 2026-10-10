@@ -13,6 +13,8 @@
 #include <mm/pmm.h>
 #include <mm/vmm.h>
 #include <drivers/pci/pci.h>
+#include <drivers/ahci/ahci.h>
+#include <drivers/blkdev/blkdev.h>
 
 
 //INTERNAL SYSLIB INCLUDES
@@ -143,6 +145,9 @@ void _main(struct multiboot_info_t *mboot_info, uint32_t mboot_magic) {
 
     pci_init();
 
+    blkdev_init();
+
+    ahci_init();
     //printf("Usable memory: %u MiB\n", total_memory / (1024 * 1024));
 
     console();

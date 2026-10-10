@@ -17,6 +17,27 @@ static uint64_t align_up(uint64_t address)
            ~(PCI_MMIO_PAGE_SIZE - 1ULL);
 }
 
+/**
+ * Verify that a virtual page contains the requested physical page.
+ *
+ * @param virtual_address Page-aligned virtual address.
+ * @param physical_address Page-aligned physical address.
+ * @return Non-zero when the page-table entry matches.
+ * @date 2026-10-10
+ */
+static int page_mapping_matches(uint64_t virtual_address,
+                                uint64_t physical_address)
+{
+    uint64_t *page_table = get_page_table(virtual_address);
+    uint16_t page_index;
+
+    if (page_table == 0)
+        return 0;
+    page_index = (uint16_t)((virtual_address >> 12) & 0x1FFULL);
+    return (page_table[page_index] & 0x000FFFFFFFFFF000ULL) ==
+           physical_address;
+}
+
 void *pci_mmio_map(uint64_t physical_address, uint64_t length)
 {
     uint64_t physical_start;
@@ -26,14 +47,17 @@ void *pci_mmio_map(uint64_t physical_address, uint64_t length)
     uint64_t offset;
     uint64_t address;
 
-    if (length == 0 || physical_address > ~0ULL - length)
+    if (length == 0 ||
+        physical_address > 0x000FFFFFFFFFF000ULL ||
+        physical_address > ~0ULL - length)
         return 0;
     offset = physical_address & (PCI_MMIO_PAGE_SIZE - 1ULL);
     physical_start = physical_address & ~(PCI_MMIO_PAGE_SIZE - 1ULL);
     physical_end = align_up(physical_address + length);
     if (physical_end == 0 || physical_end < physical_start)
         return 0;
-    if (physical_end <= PCI_IDENTITY_LIMIT)
+    if (physical_address < PCI_IDENTITY_LIMIT &&
+        length <= PCI_IDENTITY_LIMIT - physical_address)
         return (void *)(uintptr_t)physical_address;
     map_length = physical_end - physical_start;
     if (next_virtual_address > PCI_MMIO_VIRTUAL_LIMIT ||
@@ -42,8 +66,17 @@ void *pci_mmio_map(uint64_t physical_address, uint64_t length)
 
     virtual_start = next_virtual_address;
     next_virtual_address += map_length;
-    for (address = 0; address < map_length; address += PCI_MMIO_PAGE_SIZE)
+    for (address = 0; address < map_length; address += PCI_MMIO_PAGE_SIZE) {
         map_page(virtual_start + address, physical_start + address, 0x003);
+        if (!page_mapping_matches(virtual_start + address,
+                                  physical_start + address)) {
+            while (address != 0) {
+                address -= PCI_MMIO_PAGE_SIZE;
+                unmap_page(virtual_start + address);
+            }
+            return 0;
+        }
+    }
     return (void *)(uintptr_t)(virtual_start + offset);
 }
 

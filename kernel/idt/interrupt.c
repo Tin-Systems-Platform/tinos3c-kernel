@@ -25,4 +25,8 @@ void isr_handler(struct regs  *r) {
         }
         outb(0x20, 0x20);     
     }
+
+    if (r->int_no == 46) {
+        
+    }
 }

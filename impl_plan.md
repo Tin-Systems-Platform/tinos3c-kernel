@@ -40,26 +40,6 @@ This plan builds out the critical missing layers for a functional OS:
 ---
 
 ## Phase 1: Storage Infrastructure (Weeks 1-3)
-
-### 1.1 PCI Driver Enhancement ⚙️
-**Why:** Your current PCI driver is too basic for storage device detection.
-
-**Required changes:**
-- Add **mass storage class filtering** (class 0x01)
-- Implement **driver matching** by vendor/device ID
-- Parse **capability pointers** for MSI interrupt support
-- Add **memory-mapped I/O (MMIO) region** discovery and mapping
-- Enumerate all discovered devices with proper logging
-
-**New kernel/drivers/pci/ files:**
-- `pci_classes.h` - Storage class definitions
-- `pci_driver.c` - Driver registration system
-- `pci_mmio.c` - MMIO mapping utilities
-
-**Estimated effort:** 2-3 days
-
----
-
 ### 1.2 Block Device Abstraction Layer
 **Why:** Both AHCI and NVMe need a common interface to VFS.
 
