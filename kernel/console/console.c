@@ -63,9 +63,7 @@ void console() {
             printf("\n");
 
             if (pos > 0) {
-                if (strcmp(buffer, "ver") == 0) {
-                    printf("Tinos3 C edition\n");
-                } else if (strcmp(buffer, "halt") == 0)
+                if (strcmp(buffer, "halt") == 0)
                 {
                     while (1) asm volatile ("hlt");
                 } else if (strcmp(buffer,"poweroff") == 0)
@@ -79,7 +77,7 @@ void console() {
                     crash();
                 }
                 else if (strcmp(buffer, "massstorageinfo") == 0) {
-                    printf("NOT IMPLEMENTED, yet");
+                    printf("NOT IMPLEMENTED, yet\n");
                 }
                 else {
                     printf("Unknown command: %s\n", buffer);
