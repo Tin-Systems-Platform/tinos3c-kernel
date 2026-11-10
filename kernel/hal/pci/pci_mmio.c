@@ -1,6 +1,6 @@
 #include "pci_mmio.h"
 
-#include <mm/vmm.h>
+#include <core/mm/vmm.h>
 
 #define PCI_MMIO_PAGE_SIZE 0x1000ULL
 #define PCI_IDENTITY_LIMIT 0x40000000ULL

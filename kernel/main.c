@@ -7,14 +7,14 @@
 #include <uacpi/event.h>
 
 //SUBSYSTEM INCLUDES
-#include <gdt/gdt.h>
-#include <idt/idt.h>
-#include <pic/pic.h>
-#include <mm/pmm.h>
-#include <mm/vmm.h>
-#include <drivers/pci/pci.h>
-#include <drivers/ahci/ahci.h>
-#include <drivers/blkdev/blkdev.h>
+#include <core/gdt/gdt.h>
+#include <core/idt/idt.h>
+#include <core/pic/pic.h>
+#include <core/mm/pmm.h>
+#include <core/mm/vmm.h>
+#include <hal/pci/pci.h>
+#include <hal/ahci/ahci.h>
+#include <hal/blkdev/blkdev.h>
 
 
 //INTERNAL SYSLIB INCLUDES
