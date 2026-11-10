@@ -1,5 +1,5 @@
 #include "console.h"
-#include <drivers/keyboard/kb.h>
+#include <hal/keyboard/kb.h>
 #include "test_cmds/sleep.h"
 #include <lib/std/stdio.h>
 #include <mm/pmm.h>
