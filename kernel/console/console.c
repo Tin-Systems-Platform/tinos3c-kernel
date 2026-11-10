@@ -78,6 +78,8 @@ void console() {
                 }
                 else if (strcmp(buffer, "massstorageinfo") == 0) {
                     printf("NOT IMPLEMENTED, yet\n");
+                } else if (strcmp(buffer, "exit") == 0) {
+                    break;
                 }
                 else {
                     printf("Unknown command: %s\n", buffer);
