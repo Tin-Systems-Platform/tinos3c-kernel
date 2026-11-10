@@ -24,6 +24,14 @@ typedef struct {
 } __attribute__((packed)) ahci_port_t;
 
 typedef struct {
+    uint32_t options;
+    uint32_t prdbc;
+    uint32_t ctba;
+    uint32_t ctbau;
+    uint32_t reserved[4];
+} __attribute__((packed)) ahci_command_header_t;
+
+typedef struct {
     uint32_t cap;
     uint32_t ghc;
     uint32_t is;

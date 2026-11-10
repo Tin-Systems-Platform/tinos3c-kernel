@@ -2,6 +2,7 @@
 
 #include <hal/pci/pci.h>
 #include <hal/pci/pci_mmio.h>
+#include <core/mm/dma.h>
 #include <lib/std/stdio.h>
 
 #define AHCI_PROG_IF 0x01
@@ -10,6 +11,11 @@
 #define AHCI_GHC_AE (1U << 31)
 #define PCI_COMMAND 0x04
 #define PCI_COMMAND_MEMORY_SPACE (1U << 1)
+#define PCI_COMMAND_BUS_MASTER (1U << 2)
+#define AHCI_COMMAND_SLOTS 32U
+#define AHCI_DMA_PAGES 4U
+#define AHCI_COMMAND_TABLE_OFFSET (2U * 4096U)
+#define AHCI_COMMAND_TABLE_SIZE 256U
 #define AHCI_PORT_OFFSET 0x100U
 #define AHCI_PORT_STRIDE 0x80U
 #define AHCI_PORT_SSTS 0x28U
@@ -55,8 +61,8 @@ static volatile uint32_t *ahci_port_register(
 /**
  * Stop one AHCI port engine and report its link/signature state.
  *
- * This deliberately does not allocate command-list/FIS memory or enable the
- * engine, because this kernel has no verified DMA-safe contiguous allocator.
+ * The port is left disabled when it has no active device link. Active ports
+ * receive their command-list, FIS, and command-table DMA memory here.
  *
  * @param hba Mapped AHCI controller register block.
  * @param port Port number from the HBA PI bitmap.
@@ -69,6 +75,9 @@ static void ahci_initialize_port(volatile ahci_hba_mem_t *hba, uint32_t port)
     volatile uint32_t *ssts = ahci_port_register(hba, port, AHCI_PORT_SSTS);
     volatile uint32_t *serr = ahci_port_register(hba, port, AHCI_PORT_SERR);
     volatile uint32_t *ie = ahci_port_register(hba, port, AHCI_PORT_IE);
+    dma_buffer_t dma;
+    ahci_command_header_t *headers;
+    uint64_t command_table;
     uint32_t command;
     uint32_t status;
     uint32_t timeout;
@@ -98,8 +107,25 @@ static void ahci_initialize_port(volatile ahci_hba_mem_t *hba, uint32_t port)
            (status & AHCI_PORT_SSTS_IPM_MASK) >> 8);
     if ((status & (AHCI_PORT_SSTS_DET_MASK | AHCI_PORT_SSTS_IPM_MASK)) ==
         AHCI_PORT_SSTS_PRESENT_ACTIVE) {
-        printf("[AHCI] Port %u has an active link; command engine remains "
-               "disabled pending DMA setup\n", port);
+        if (!dma_alloc_pages(AHCI_DMA_PAGES, &dma)) {
+            printf("[AHCI] Port %u DMA allocation failed\n", port);
+            return;
+        }
+        headers = (ahci_command_header_t *)dma.virtual_address;
+        command_table = dma.physical_address + AHCI_COMMAND_TABLE_OFFSET;
+        for (uint32_t slot = 0; slot < AHCI_COMMAND_SLOTS; ++slot) {
+            headers[slot].ctba = (uint32_t)command_table;
+            headers[slot].ctbau = (uint32_t)(command_table >> 32);
+            command_table += AHCI_COMMAND_TABLE_SIZE;
+        }
+
+        hba->ports[port].clb = (uint32_t)dma.physical_address;
+        hba->ports[port].clbu = (uint32_t)(dma.physical_address >> 32);
+        hba->ports[port].fb = (uint32_t)(dma.physical_address + 4096U);
+        hba->ports[port].fbu =
+            (uint32_t)((dma.physical_address + 4096U) >> 32);
+        *cmd = *cmd | AHCI_PORT_CMD_FRE | AHCI_PORT_CMD_ST;
+        printf("[AHCI] Port %u DMA ready; command engine enabled\n", port);
     }
 }
 
@@ -127,12 +153,10 @@ static void ahci_probe_controller(pci_device_t *device)
     command = pci_config_read16(device->bus, device->device,
                                 device->function, PCI_COMMAND);
     if ((command & PCI_COMMAND_MEMORY_SPACE) == 0) {
-        /*
-         * Firmware normally enables this before handing off the device.
-         * Enabling memory decoding is safe here; bus mastering remains off.
-         */
+        /* Firmware normally enables this before handing off the device. */
         pci_config_write16(device->bus, device->device, device->function,
-                           PCI_COMMAND, command | PCI_COMMAND_MEMORY_SPACE);
+                           PCI_COMMAND, command | PCI_COMMAND_MEMORY_SPACE |
+                           PCI_COMMAND_BUS_MASTER);
         command = pci_config_read16(device->bus, device->device,
                                     device->function, PCI_COMMAND);
         if ((command & PCI_COMMAND_MEMORY_SPACE) == 0) {
@@ -140,6 +164,17 @@ static void ahci_probe_controller(pci_device_t *device)
                    device->bus, device->device, device->function);
             return;
         }
+    }
+    if ((command & PCI_COMMAND_BUS_MASTER) == 0) {
+        pci_config_write16(device->bus, device->device, device->function,
+                           PCI_COMMAND, command | PCI_COMMAND_BUS_MASTER);
+        command = pci_config_read16(device->bus, device->device,
+                                    device->function, PCI_COMMAND);
+    }
+    if ((command & PCI_COMMAND_BUS_MASTER) == 0) {
+        printf("[AHCI] PCI bus mastering is disabled on %02x:%02x.%u\n",
+               device->bus, device->device, device->function);
+        return;
     }
 
     /*
