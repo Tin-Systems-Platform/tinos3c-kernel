@@ -1,7 +1,7 @@
 #include "vmm.h"
 
 #include <lib/std/stdio.h>
-#include <mm/pmm.h>
+#include <core/mm/pmm.h>
 
 #define PAGE_SIZE                 0x1000ULL
 #define PAGE_ENTRIES              512U

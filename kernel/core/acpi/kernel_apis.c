@@ -1,10 +1,10 @@
 #include <uacpi/kernel_api.h>
 
-#include <drivers/pci/pci.h>
+#include <hal/pci/pci.h>
 #include <lib/std/stdlib.h>
 #include <lib/std/stdint.h>
 #include <lib/std/stdio.h>
-#include <mm/vmm.h>
+#include <core/mm/vmm.h>
 #include <uacpi/internal/stdlib.h>
 
 #define ACPI_PAGE_SIZE          0x1000ULL

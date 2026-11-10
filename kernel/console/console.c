@@ -2,7 +2,7 @@
 #include <hal/keyboard/kb.h>
 #include "test_cmds/sleep.h"
 #include <lib/std/stdio.h>
-#include <mm/pmm.h>
+#include <core/mm/pmm.h>
 #include <lib/sys/panic.h>
 #include "test_cmds/crash.h"
 
