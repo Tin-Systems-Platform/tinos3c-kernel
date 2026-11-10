@@ -1,8 +1,8 @@
 #include "console.h"
-#include <drivers/keyboard/kb.h>
+#include <hal/keyboard/kb.h>
 #include "test_cmds/sleep.h"
 #include <lib/std/stdio.h>
-#include <mm/pmm.h>
+#include <core/mm/pmm.h>
 #include <lib/sys/panic.h>
 #include "test_cmds/crash.h"
 
@@ -63,9 +63,7 @@ void console() {
             printf("\n");
 
             if (pos > 0) {
-                if (strcmp(buffer, "ver") == 0) {
-                    printf("Tinos3 C edition\n");
-                } else if (strcmp(buffer, "halt") == 0)
+                if (strcmp(buffer, "halt") == 0)
                 {
                     while (1) asm volatile ("hlt");
                 } else if (strcmp(buffer,"poweroff") == 0)
@@ -79,7 +77,9 @@ void console() {
                     crash();
                 }
                 else if (strcmp(buffer, "massstorageinfo") == 0) {
-                    printf("NOT IMPLEMENTED, yet");
+                    printf("NOT IMPLEMENTED, yet\n");
+                } else if (strcmp(buffer, "exit") == 0) {
+                    break;
                 }
                 else {
                     printf("Unknown command: %s\n", buffer);

@@ -1,8 +1,8 @@
-#include <idt/interrupt.h>
+#include <core/idt/interrupt.h>
 
-#include <pic/pic.h>
-#include <drivers/keyboard/kb.h>
-#include <mm/vmm.h>
+#include <core/pic/pic.h>
+#include <hal/keyboard/kb.h>
+#include <core/mm/vmm.h>
 
 
 // Common ISR handler
@@ -24,5 +24,9 @@ void isr_handler(struct regs  *r) {
             outb(0xA0, 0x20); 
         }
         outb(0x20, 0x20);     
+    }
+
+    if (r->int_no == 46) {
+        
     }
 }

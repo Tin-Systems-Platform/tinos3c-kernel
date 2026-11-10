@@ -33,6 +33,6 @@ void pic_remap(int offset1, int offset2) {
 
 
     io_wait();
-    outb(PIC1_DATA, 0x0); 
-    outb(PIC2_DATA, 0x0);
+    outb(PIC1_DATA, 0xF8);
+    outb(PIC2_DATA, 0xBF);
 }

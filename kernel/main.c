@@ -7,12 +7,14 @@
 #include <uacpi/event.h>
 
 //SUBSYSTEM INCLUDES
-#include <gdt/gdt.h>
-#include <idt/idt.h>
-#include <pic/pic.h>
-#include <mm/pmm.h>
-#include <mm/vmm.h>
-#include <drivers/pci/pci.h>
+#include <core/gdt/gdt.h>
+#include <core/idt/idt.h>
+#include <core/pic/pic.h>
+#include <core/mm/pmm.h>
+#include <core/mm/vmm.h>
+#include <hal/pci/pci.h>
+#include <hal/ahci/ahci.h>
+#include <hal/blkdev/blkdev.h>
 
 
 //INTERNAL SYSLIB INCLUDES
@@ -143,8 +145,11 @@ void _main(struct multiboot_info_t *mboot_info, uint32_t mboot_magic) {
 
     pci_init();
 
+    blkdev_init();
+
+    ahci_init();
     //printf("Usable memory: %u MiB\n", total_memory / (1024 * 1024));
 
     console();
-    panic("Kernel has panic due to something going wrong internally", "DEBUG_CONSOLE_EXITED");
+    panic("Kernel has paniced due to something going wrong internally", "DEBUG_CONSOLE_EXITED");
 }
