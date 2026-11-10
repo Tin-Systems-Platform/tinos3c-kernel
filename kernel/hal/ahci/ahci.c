@@ -1,7 +1,7 @@
 #include "ahci.h"
 
-#include <drivers/pci/pci.h>
-#include <drivers/pci/pci_mmio.h>
+#include <hal/pci/pci.h>
+#include <hal/pci/pci_mmio.h>
 #include <lib/std/stdio.h>
 
 #define AHCI_PROG_IF 0x01
