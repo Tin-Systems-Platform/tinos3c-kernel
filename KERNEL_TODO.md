@@ -16,9 +16,9 @@
 - [ ] Mouse drivers
 - [ ] Network drivers
 - [ ] Audio drivers
-- [ ] Disk drivers
+- [X] Disk drivers
 - [ ] PCIe drivers
-- [ ] AHCI Drivers
+- [X] AHCI Drivers
 
 ## Stability
 - [ ] Fix bugs when having bugs

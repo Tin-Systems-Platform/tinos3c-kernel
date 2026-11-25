@@ -104,6 +104,219 @@ static void show_memory_info(void) {
     printf("%%\n");
 }
 
+/** Print a sector capacity using MiB or GiB units.
+ * @param sectors Sector count.
+ * @return None.
+ * @copyright See LICENSE.md.
+ * @date 2026-11-25 */
+static void print_disk_size(uint64_t sectors)
+{
+    const uint64_t sectors_per_gib = 2097152ULL;
+    const uint64_t sectors_per_mib = 2048ULL;
+    if (sectors >= sectors_per_gib) {
+        uint64_t whole = sectors / sectors_per_gib;
+        uint64_t fraction = (sectors % sectors_per_gib) * 100 / sectors_per_gib;
+        printf("%u.", whole);
+        if (fraction < 10) printf("0");
+        printf("%u GiB", fraction);
+    } else {
+        uint64_t whole = sectors / sectors_per_mib;
+        uint64_t fraction = (sectors % sectors_per_mib) * 100 / sectors_per_mib;
+        printf("%u.", whole);
+        if (fraction < 10) printf("0");
+        printf("%u MiB", fraction);
+    }
+}
+
+/** Parse a whitespace-separated command into a bounded token array.
+ * @param command Mutable command line.
+ * @param tokens Output token pointers.
+ * @param capacity Maximum tokens available.
+ * @return Token count, or zero when the token array is too small.
+ * @copyright See LICENSE.md.
+ * @date 2026-11-25 */
+static uint32_t split_command(char *command, char **tokens, uint32_t capacity)
+{
+    uint32_t count = 0;
+    char *cursor = command;
+    while (*cursor != 0) {
+        while (*cursor == ' ' || *cursor == '\t') ++cursor;
+        if (*cursor == 0) break;
+        if (count == capacity) return 0;
+        tokens[count++] = cursor;
+        while (*cursor != 0 && *cursor != ' ' && *cursor != '\t') ++cursor;
+        if (*cursor != 0) *cursor++ = 0;
+    }
+    return count;
+}
+
+/** Parse one complete unsigned decimal command token.
+ * @param token Text token.
+ * @param value Output value.
+ * @return Nonzero if the token contains only a valid decimal integer.
+ * @copyright See LICENSE.md.
+ * @date 2026-11-25 */
+static int parse_number_token(const char *token, uint64_t *value)
+{
+    const char *end = parse_decimal(token, value);
+    return end != 0 && *end == 0;
+}
+
+/** Show a disk and all its current partition entries.
+ * @param disk_index Zero-based whole-disk number.
+ * @return None; prints an error if the disk does not exist.
+ * @copyright See LICENSE.md.
+ * @date 2026-11-25 */
+static void show_disk_info(uint64_t disk_index)
+{
+    struct block_device *disk = disk_index > UINT32_MAX ? 0 :
+        blkdev_disk_get((uint32_t)disk_index);
+    if (disk == 0) {
+        printf("No disk with that number. Use 'disk list' to see available disks.\n");
+        return;
+    }
+
+    enum blkdev_partition_table table = blkdev_disk_table(disk);
+    const char *table_name = table == BLKDEV_PARTITION_TABLE_MBR ? "MBR" :
+        table == BLKDEV_PARTITION_TABLE_GPT ? "GPT" : "not initialized";
+    printf("Disk %u: %s, ", disk_index, disk->name);
+    print_disk_size(disk->capacity_lba);
+    printf(" (%u sectors), table: %s\n", disk->capacity_lba, table_name);
+
+    if (table == BLKDEV_PARTITION_TABLE_NONE) {
+        printf("  No supported partition table. Run 'disk help' for setup steps.\n");
+        return;
+    }
+
+    uint32_t listed = 0;
+    uint32_t max_entries = table == BLKDEV_PARTITION_TABLE_MBR ? 4 : 128;
+    for (uint32_t number = 1; number <= max_entries; ++number) {
+        struct blkdev_partition_info info;
+        if (blkdev_partition_get_info(disk, number, &info) != 0) continue;
+        printf("  %s: start LBA %u, ", info.name, info.start_lba);
+        print_disk_size(info.sector_count);
+        printf(" (%u sectors)\n", info.sector_count);
+        ++listed;
+    }
+    if (listed == 0) printf("  No partitions yet. Use 'disk create' to add one.\n");
+}
+
+/** List disks or perform one beginner-oriented disk-management command.
+ * Supported sizes are whole MiB; omitted create start means first available
+ * aligned space. Initialization and deletion change table metadata.
+ * @param command Mutable command line beginning with "disk".
+ * @return None; prints usage and operation status.
+ * @copyright See LICENSE.md.
+ * @date 2026-11-25 */
+static void disk_command(char *command)
+{
+    char *tokens[6];
+    uint32_t count = split_command(command, tokens, 6);
+    uint64_t disk_index, value, size_lba, start_lba;
+    struct block_device *disk;
+    if (count < 2 || strcmp(tokens[1], "help") == 0) {
+        printf("Disk commands (disk numbers start at 0):\n");
+        printf("  disk list\n");
+        printf("  disk info <disk>\n");
+        printf("  disk init <disk> mbr|gpt  (use on a blank disk)\n");
+        printf("  disk create <disk> <size-MiB> [start-MiB]\n");
+        printf("  disk resize <disk> <partition> <new-size-MiB> [confirm-shrink]\n");
+        printf("  disk delete <disk> <partition>  (removes entry; keeps data)\n");
+        printf("Create chooses the first free 1 MiB-aligned space when start is omitted.\n");
+        printf("Example: disk init 0 gpt, then disk create 0 1024, then disk list.\n");
+        printf("Resize keeps the start; shrinking can cut off filesystem data.\n");
+        printf("Delete removes the table entry, so filesystems on it become inaccessible.\n");
+        return;
+    }
+    if (strcmp(tokens[1], "list") == 0) {
+        uint32_t disk_count = blkdev_disk_count();
+        if (disk_count == 0) printf("No disks registered.\n");
+        for (uint32_t i = 0; i < disk_count; ++i) {
+            show_disk_info(i);
+        }
+        return;
+    }
+    if (strcmp(tokens[1], "info") == 0 && count == 3 &&
+        parse_number_token(tokens[2], &disk_index)) {
+        show_disk_info(disk_index);
+        return;
+    }
+    if (count < 3 || !parse_number_token(tokens[2], &disk_index) ||
+        disk_index > UINT32_MAX || (disk = blkdev_disk_get((uint32_t)disk_index)) == 0) {
+        printf("Invalid disk number. Use 'disk list' to see available disks.\n");
+        return;
+    }
+    if (strcmp(tokens[1], "init") == 0 && count == 4) {
+        enum blkdev_partition_table table = strcmp(tokens[3], "mbr") == 0 ?
+            BLKDEV_PARTITION_TABLE_MBR : strcmp(tokens[3], "gpt") == 0 ?
+            BLKDEV_PARTITION_TABLE_GPT : BLKDEV_PARTITION_TABLE_NONE;
+        if (table == BLKDEV_PARTITION_TABLE_NONE) {
+            printf("Choose 'mbr' or 'gpt'.\n");
+        } else if (blkdev_disk_initialize(disk, table) != 0) {
+            printf("Could not initialize disk. It may already contain a table or data.\n");
+        } else {
+            printf("Initialized %s with %s.\n", disk->name,
+                   table == BLKDEV_PARTITION_TABLE_MBR ? "MBR" : "GPT");
+        }
+        return;
+    }
+    if (strcmp(tokens[1], "create") == 0 && (count == 4 || count == 5) &&
+        parse_number_token(tokens[3], &value) && value != 0 &&
+        value <= ~0ULL / 2048ULL) {
+        size_lba = value * 2048ULL;
+        start_lba = 0;
+        if (count == 5) {
+            if (!parse_number_token(tokens[4], &value) || value == 0 ||
+                value > ~0ULL / 2048ULL) {
+                printf("Start size must be a positive whole MiB.\n");
+                return;
+            }
+            start_lba = value * 2048ULL;
+        }
+        uint32_t number;
+        if (blkdev_partition_create(disk, size_lba, start_lba, &number) != 0)
+            printf("Could not create partition: size may not fit or the table may be full.\n");
+        else {
+            printf("Created partition %u on %s: ", number, disk->name);
+            print_disk_size(size_lba);
+            printf(".\n");
+        }
+        return;
+    }
+    if (strcmp(tokens[1], "resize") == 0 && (count == 5 || count == 6) &&
+        parse_number_token(tokens[3], &value) && value > 0 && value <= UINT32_MAX &&
+        parse_number_token(tokens[4], &size_lba) && size_lba > 0 &&
+        size_lba <= ~0ULL / 2048ULL) {
+        struct blkdev_partition_info old_info;
+        if (count == 6 && strcmp(tokens[5], "confirm-shrink") != 0) {
+            printf("For a smaller size, add 'confirm-shrink' after the size.\n");
+            return;
+        }
+        size_lba *= 2048ULL;
+        if (blkdev_partition_get_info(disk, (uint32_t)value, &old_info) != 0) {
+            printf("No partition with that number.\n");
+            return;
+        }
+        if (size_lba < old_info.sector_count &&
+            (count != 6 || strcmp(tokens[5], "confirm-shrink") != 0)) {
+            printf("Shrinking can cut off filesystem data. Shrink the filesystem first, then repeat with 'confirm-shrink'.\n");
+            return;
+        }
+        if (blkdev_partition_resize(disk, (uint32_t)value, size_lba) != 0)
+            printf("Could not resize partition: it may overlap another partition or exceed the disk.\n");
+        else printf("Resized partition %u.\n", value);
+        return;
+    }
+    if (strcmp(tokens[1], "delete") == 0 && count == 4 &&
+        parse_number_token(tokens[3], &value) && value > 0 && value <= UINT32_MAX) {
+        if (blkdev_partition_delete(disk, (uint32_t)value) != 0)
+            printf("Could not delete that partition.\n");
+        else printf("Removed partition %u's table entry; its data sectors were not erased.\n", value);
+        return;
+    }
+    printf("Unknown or incomplete disk command. Type 'disk help'.\n");
+}
+
 
 
 void console() {
@@ -141,6 +354,10 @@ void console() {
                 }
                 else if (strcmp(buffer, "crash") == 0) {
                     crash();
+                } else if (pos >= 4 && buffer[0] == 'd' && buffer[1] == 'i' &&
+                           buffer[2] == 's' && buffer[3] == 'k' &&
+                           (buffer[4] == ' ' || buffer[4] == '\t' || buffer[4] == 0)) {
+                    disk_command(buffer);
                 }
                 else if (strcmp(buffer, "massstorageinfo") == 0) {
                     uint32_t index = 0;
