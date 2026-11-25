@@ -2,10 +2,7 @@
 
 ## Executive Summary
 
-This plan builds out the critical missing layers for a functional OS:
-1. **Storage layer** - Hardware drivers + abstraction layer
-2. **Filesystem layer** - VFS + filesystem implementations  
-3. **Userspace** - Syscalls, init system, custom language interpreter
+This plan describes the work still needed for a functional OS. The repository already has PCI enumeration/driver binding, PCI BAR and MSI capability handling, PCI MMIO mapping, a block-device registry with MBR/GPT partition support, an AHCI driver, and VFS/FAT32 source-file placeholders. The VFS and FAT32 files are empty, so those layers are not implemented yet. Syscalls, process loading, userspace, and the custom language are also not present.
 
 **Estimated complexity:** Medium-High | **Timeline:** 3-4 months (sequential), 1-2 months (parallel teams)
 
@@ -40,7 +37,13 @@ This plan builds out the critical missing layers for a functional OS:
 ---
 
 ## Phase 1: Storage Infrastructure (Weeks 1-3)
+**Current state:** PCI support, block-device core/partition management, and AHCI source implementations exist. Review and finish these existing components as needed; do not treat them as wholly new subsystems. NVMe is not present.
+
+### 1.1 PCI Support (Implemented)
+PCI enumeration, configuration access, BAR discovery, capability parsing, driver registration/binding, and MMIO mapping are present under `kernel/hal/pci/`.
+
 ### 1.2 Block Device Abstraction Layer
+**Status:** Implemented under `kernel/hal/blkdev/`. It provides device registration and validated sector I/O, plus partition discovery and management for MBR and GPT. There is no request queue or cache implementation in the current code.
 **Why:** Both AHCI and NVMe need a common interface to VFS.
 
 **Design:**
@@ -75,6 +78,7 @@ struct block_device {
 ---
 
 ### 1.3 AHCI Driver
+**Status:** An AHCI implementation exists under `kernel/hal/ahci/`. It discovers PCI controllers, initializes ports, issues sector reads/writes, and registers disks with the block-device layer. `ahci_cmd.c` is empty; command handling is in `ahci.c`. The boot path invokes PCI initialization, block-device initialization, AHCI initialization, and partition scanning.
 **Why:** AHCI is the standard protocol for SATA SSDs/HDDs.
 
 **AHCI Basics:**
@@ -112,6 +116,7 @@ struct block_device {
 
 ### 1.4 NVMe Driver (Optional but Recommended)
 **Why:** Modern SSDs are NVMe. AHCI won't work for them.
+**Status:** Not started. Will not be implemented in the first phase, but should be planned for later.
 
 **NVMe Basics:**
 - Queue-based interface: submission queues (SQ) and completion queues (CQ)
@@ -128,6 +133,7 @@ struct block_device {
 ---
 
 ## Phase 2: Virtual Filesystem (Weeks 4-5)
+**Current state:** `kernel/fs/vfs.c`, `vfs.h`, `namei.c`, `file.c`, `inode.c`, and all files under `kernel/fs/fat32/` are empty. VFS and FAT32 remain to be implemented; the planned interfaces below are proposals, not current APIs.
 
 ### 2.1 VFS Design
 **Why:** Abstraction layer so multiple filesystems can coexist.
@@ -271,6 +277,7 @@ int vfs_stat(const char *path, struct stat *st);
 ---
 
 ## Phase 3: Syscall Interface & Userspace (Weeks 6-8)
+**Current state:** No syscall subsystem, process loader, scheduler, init program, or separate userspace C library is present in the repository. The existing `kernel/lib/` contains kernel-side support code.
 
 ### 3.1 Kernel Syscall Interface
 **Why:** Bridge between userspace and kernel.
@@ -399,6 +406,7 @@ int main() {
 ---
 
 ## Phase 4: Custom Language Interpreter (Weeks 9-12)
+**Current state:** No lexer, parser, VM, language standard library, or kernel bindings are present.
 
 ### 4.1 Language Design
 **Recommendations:**
@@ -576,6 +584,7 @@ def run_background(cmd):
 ---
 
 ## Phase 5: Integration & Testing (Weeks 13-16)
+**Current state:** The boot code initializes memory management, PCI, block devices, and AHCI, scans disk partitions, then enters the temporary debug console. It does not mount a filesystem or start userspace, so the end-to-end scenario below is still planned work.
 
 ### 5.1 Full Boot & Integration Test
 
@@ -607,19 +616,19 @@ $ /bin/shell  # Shell or custom language REPL
 
 **Hard dependencies drive this order:**
 
-1. **pci-enhance** ← Start here
-2. **diskio-layer** ← Blocks all storage work
-3. **ahci-driver** ← Enables disk access
-4. **vfs-design** + **vfs-core** ← Foundation for filesystem
-5. **fat32-fs** ← Read-only FAT32
-6. **syscall-iface** ← Enables userspace
-7. **init-loader** ← Load userspace programs
-8. **userspace-lib** ← Basic libc
-9. **lang-lexer, lang-parser, lang-vm** ← Parallel
-10. **lang-stdlib** ← Language utilities
-11. **lang-kernel-bindings** ← Kernel interaction
-12. **init-script** ← Final piece
-13. **integration-test** ← Full system test
+1. **pci-enhance** — implemented; review existing PCI support
+2. **diskio-layer** — implemented, including MBR/GPT partition support
+3. **ahci-driver** — implementation exists; review and complete as needed
+4. **vfs-design** + **vfs-core** — not implemented; source files are empty
+5. **fat32-fs** — not implemented; source files are empty
+6. **syscall-iface** — not present
+7. **init-loader** — not present
+8. **userspace-lib** — not present as a separate userspace library; `kernel/lib` is kernel support code
+9. **lang-lexer, lang-parser, lang-vm** — not present
+10. **lang-stdlib** — not present
+11. **lang-kernel-bindings** — not present
+12. **init-script** — not present
+13. **integration-test** — the described end-to-end flow is not implemented
 
 ---
 
@@ -678,20 +687,25 @@ $ /bin/shell  # Shell or custom language REPL
 
 ```
 kernel/
-├── drivers/
-│   ├── pci/              # [ENHANCE] PCI driver
-│   ├── blkdev/           # [NEW] Block device layer
-│   ├── ahci/             # [NEW] AHCI driver
-│   └── nvme/             # [DEFER] NVMe driver
+├── hal/
+│   ├── pci/              # PCI enumeration, drivers, config, MMIO
+│   ├── blkdev/           # Block-device registry and partition support
+│   └── ahci/             # AHCI driver implementation
 ├── fs/
-│   ├── vfs.h/c           # [NEW] Virtual filesystem
-│   ├── namei.c           # [NEW] Path traversal
-│   ├── fat32/            # [NEW] FAT32 implementation
-│   └── ext2/             # [DEFER] ext2 implementation
-├── syscall/              # [NEW] Syscall interface
-└── process/              # [NEW] Process management
+│   ├── vfs.h/c           # Empty placeholders; VFS not implemented
+│   ├── namei.c            # Empty placeholder
+│   ├── file.c             # Empty placeholder
+│   ├── inode.c            # Empty placeholder
+│   └── fat32/             # Empty placeholders; FAT32 not implemented
 
-libc/                      # [NEW] Userspace C library
+kernel/lib/                # Kernel library, not a userspace libc
+```
+
+Planned future areas not currently present:
+```
+kernel/syscall/            # Syscall interface
+kernel/process/            # Process management
+libc/                      # Userspace C library
 ├── crt0.S
 ├── syscall.S
 ├── malloc.c
