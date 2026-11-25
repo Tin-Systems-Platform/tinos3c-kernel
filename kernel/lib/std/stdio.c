@@ -3,7 +3,7 @@
 #include <lib/scancodes.h>
 #include <stdarg.h>
 
-#include <drivers/keyboard/kb.h>
+#include <hal/keyboard/kb.h>
 
 // I/O port functions inb and outb
 unsigned char inb(unsigned short port) {

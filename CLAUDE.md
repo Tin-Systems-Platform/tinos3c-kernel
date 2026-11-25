@@ -9,12 +9,12 @@ You are an expert in low-level systems programming, C, and Assembly. Code should
 Most kernel source code is located in the `kernel/` directory.
 
 - `kernel/console`: Temporary debug console used during development. Do not modify it unless explicitly requested.
-- `kernel/drivers`: Hardware driver implementations.
-- `kernel/gdt`: Global Descriptor Table (GDT) related code.
-- `kernel/idt`: Interrupt Descriptor Table (IDT) related code.
+- `kernel/hal`: Hardware Abstraction Layer (HAL) impl and kernel built-in drivers.
+- `kernel/core/gdt`: Global Descriptor Table (GDT) related code.
+- `kernel/core/idt`: Interrupt Descriptor Table (IDT) related code.
 - `kernel/lib`: Internal kernel library code and the custom C standard library implementation.
-- `kernel/mm`: Physical and virtual memory management.
-- `kernel/pic`: Programmable Interrupt Controller (PIC) related code.
+- `kernel/core/mm`: Physical and virtual memory management.
+- `kernel/core/pic`: Programmable Interrupt Controller (PIC) related code.
 - `kernel/fs`: Virtual Filesystem (VFS) Implementation
 
 ## Kernel Development Rules

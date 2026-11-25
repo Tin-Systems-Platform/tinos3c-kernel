@@ -1,10 +1,10 @@
 #include <uacpi/kernel_api.h>
 
-#include <drivers/pci/pci.h>
+#include <hal/pci/pci.h>
 #include <lib/std/stdlib.h>
 #include <lib/std/stdint.h>
 #include <lib/std/stdio.h>
-#include <mm/vmm.h>
+#include <core/mm/vmm.h>
 #include <uacpi/internal/stdlib.h>
 
 #define ACPI_PAGE_SIZE          0x1000ULL
@@ -128,7 +128,8 @@ void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len)
     uint32_t index;
     struct acpi_mapping *record;
 
-    if (requested_length == 0)
+    if (requested_length == 0 ||
+        physical_address > ~(uint64_t)0 - requested_length)
         return UACPI_MAP_FAILED;
 
     if (physical_address < ACPI_IDENTITY_MAP_LIMIT &&
@@ -284,7 +285,7 @@ uacpi_status uacpi_kernel_pci_read8(
     uacpi_size offset,
     uacpi_u8 *value
 ) {
-    if (device == NULL || value == NULL)
+    if (device == NULL || value == NULL || offset >= 256)
         return UACPI_STATUS_INVALID_ARGUMENT;
 
     tinos_pci_handle_t *pci = pci_handle(device);
@@ -304,7 +305,7 @@ uacpi_status uacpi_kernel_pci_read16(
     uacpi_size offset,
     uacpi_u16 *value
 ) {
-    if (device == NULL || value == NULL)
+    if (device == NULL || value == NULL || offset > 254)
         return UACPI_STATUS_INVALID_ARGUMENT;
 
     tinos_pci_handle_t *pci = pci_handle(device);
@@ -324,7 +325,7 @@ uacpi_status uacpi_kernel_pci_read32(
     uacpi_size offset,
     uacpi_u32 *value
 ) {
-    if (device == NULL || value == NULL)
+    if (device == NULL || value == NULL || offset > 252)
         return UACPI_STATUS_INVALID_ARGUMENT;
 
     tinos_pci_handle_t *pci = pci_handle(device);
@@ -344,7 +345,7 @@ uacpi_status uacpi_kernel_pci_write8(
     uacpi_size offset,
     uacpi_u8 value
 ) {
-    if (device == NULL)
+    if (device == NULL || offset >= 256)
         return UACPI_STATUS_INVALID_ARGUMENT;
 
     tinos_pci_handle_t *pci = pci_handle(device);
@@ -365,7 +366,7 @@ uacpi_status uacpi_kernel_pci_write16(
     uacpi_size offset,
     uacpi_u16 value
 ) {
-    if (device == NULL)
+    if (device == NULL || offset > 254)
         return UACPI_STATUS_INVALID_ARGUMENT;
 
     tinos_pci_handle_t *pci = pci_handle(device);
@@ -386,7 +387,7 @@ uacpi_status uacpi_kernel_pci_write32(
     uacpi_size offset,
     uacpi_u32 value
 ) {
-    if (device == NULL)
+    if (device == NULL || offset > 252)
         return UACPI_STATUS_INVALID_ARGUMENT;
 
     tinos_pci_handle_t *pci = pci_handle(device);
@@ -412,7 +413,8 @@ uacpi_status uacpi_kernel_io_map(
     uacpi_size len,
     uacpi_handle *out_handle
 ) {
-    if (out_handle == NULL || len == 0)
+    if (out_handle == NULL || len == 0 || base > 0xFFFFU ||
+        len > 0x10000ULL - base)
         return UACPI_STATUS_INVALID_ARGUMENT;
 
     tinos_io_handle_t *io =
@@ -489,7 +491,7 @@ uacpi_status uacpi_kernel_io_read16(
     tinos_io_handle_t *io =
         (tinos_io_handle_t *)handle;
 
-    if (offset + 2 > io->len)
+    if (offset > io->len || io->len - offset < 2)
         return UACPI_STATUS_INVALID_ARGUMENT;
 
     *out_value = inw((uint16_t)(io->base + offset));
@@ -508,7 +510,7 @@ uacpi_status uacpi_kernel_io_read32(
     tinos_io_handle_t *io =
         (tinos_io_handle_t *)handle;
 
-    if (offset + 4 > io->len)
+    if (offset > io->len || io->len - offset < 4)
         return UACPI_STATUS_INVALID_ARGUMENT;
 
     *out_value = inl((uint16_t)(io->base + offset));
@@ -527,7 +529,7 @@ uacpi_status uacpi_kernel_io_write8(
     tinos_io_handle_t *io =
         (tinos_io_handle_t *)handle;
 
-    if (offset >= io->len)
+    if (offset > io->len || io->len - offset < 2)
         return UACPI_STATUS_INVALID_ARGUMENT;
 
     outb((uint16_t)(io->base + offset), in_value);
@@ -546,7 +548,7 @@ uacpi_status uacpi_kernel_io_write16(
     tinos_io_handle_t *io =
         (tinos_io_handle_t *)handle;
 
-    if (offset >= io->len)
+    if (offset > io->len || io->len - offset < 4)
         return UACPI_STATUS_INVALID_ARGUMENT;
 
     outw((uint16_t)(io->base + offset), in_value);
@@ -708,11 +710,15 @@ void uacpi_kernel_restore_interrupts(uacpi_interrupt_state state)
         asm volatile ("sti" ::: "memory");
 }
 
-uacpi_status uacpi_kernel_acquire_mutex(uacpi_handle, uacpi_u16) {
+uacpi_status uacpi_kernel_acquire_mutex(uacpi_handle mutex, uacpi_u16 timeout) {
+    (void)mutex;
+    (void)timeout;
     return UACPI_STATUS_OK;
 }
 
-void uacpi_kernel_release_mutex(uacpi_handle) {} // This doesn't need anything since we don't use mutexes in the kernel
+void uacpi_kernel_release_mutex(uacpi_handle mutex) {
+    (void)mutex;
+} // No scheduler or concurrent ACPI execution exists yet.
 
 uacpi_bool uacpi_kernel_wait_for_event(uacpi_handle handle, uacpi_u16 timeout) {
      if (!handle) return UACPI_STATUS_INVALID_ARGUMENT;

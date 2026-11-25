@@ -25,19 +25,35 @@ KERNEL_OBJS := $(addprefix bin/kernel/, $(KERNEL_S_SOURCES:.S=.S.o) $(KERNEL_C_S
 # Flags
 ASFLAGS = -f elf64 -g -F dwarf
 CCFLAGS = -m64 -std=gnu11 -ffreestanding -Wall -Wextra -nostdlib -I kernel -I $(UACPI_DIR)/include -I internal -fno-stack-protector -Wno-unused-parameter -fno-stack-check -fno-lto -mno-mmx -mno-80387 -mno-sse -mno-sse2 -mno-red-zone -fno-pic -mcmodel=kernel
-QEMUFLAGS = -m 192M -debugcon stdio -cdrom bin/$(IMAGE_NAME).iso -boot d
+QEMUFLAGS = -machine q35 -m 192M -debugcon stdio -cdrom bin/$(IMAGE_NAME).iso -boot d
+QEMU_DISK_FLAGS = -drive file=$(DISK_IMAGE),format=raw,if=none,id=tinos-disk \
+	-device ich9-ahci,id=tinos-ahci \
+	-device ide-hd,drive=tinos-disk,bus=tinos-ahci.0
 LDFLAGS = -m elf_x86_64 -Tkernel/linker.ld -z noexecstack
 
 # Output image name
 IMAGE_NAME = image
+DISK_IMAGE ?= bin/tinos3c-disk.img
+DISK_SIZE ?= 64M
+
+.PHONY: run run-gdb disk-image
 
 all: boot kernel iso
 
-run: all
-	@qemu-system-x86_64 $(QEMUFLAGS)
+run: all disk-image
+	@qemu-system-x86_64 $(QEMUFLAGS) $(QEMU_DISK_FLAGS)
 
-run-gdb: all
-	@qemu-system-x86_64 $(QEMUFLAGS) -S -s
+run-gdb: all disk-image
+	@qemu-system-x86_64 $(QEMUFLAGS) $(QEMU_DISK_FLAGS) -S -s
+
+disk-image:
+	@mkdir -p "$$(dirname "$(DISK_IMAGE)")"
+	@if [ -e "$(DISK_IMAGE)" ]; then \
+		echo " using existing disk image $(DISK_IMAGE)"; \
+	else \
+		echo " creating disk image $(DISK_IMAGE) ($(DISK_SIZE))"; \
+		truncate -s "$(DISK_SIZE)" "$(DISK_IMAGE)"; \
+	fi
 
 bin/kernel/%.c.o: kernel/%.c
 	@echo " CC $<"

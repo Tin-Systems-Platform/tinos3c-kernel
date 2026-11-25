@@ -1,0 +1,29 @@
+name: build
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6.1.0
+
+      - name: Make install script executable
+        run: chmod +x scripts/install-tools-ubuntu.sh
+
+      - name: Setup Tools
+        run: scripts/install-tools-ubuntu.sh
+
+      - name: Build ISO
+        run: make
+
+      - name: Upload ISO
+        uses: actions/upload-artifact@v6
+        with:
+          path: bin/image.iso
+          retention-days: 90
+          name: "Tinos3c kernel image"

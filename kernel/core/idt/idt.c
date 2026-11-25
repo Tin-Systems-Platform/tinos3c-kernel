@@ -4,6 +4,7 @@
 extern void isr0();
 extern void isr1();
 extern void isr14();
+extern void isr46();
 
 idt_entry_t idt[256] __attribute__((aligned(16), section(".data")));
 idt_ptr_t idt_p __attribute__((section(".data")));
@@ -22,12 +23,17 @@ void idt_set_gate(uint8_t num, uint64_t offset, uint16_t sel, uint8_t flags) {
 }
 
 // Initialize the IDT
-void init_idt() {   
+void init_idt() {
+
     idt_p.limit = (sizeof(idt_entry_t) * 256) - 1;
     idt_p.base  = (uint64_t)(uintptr_t)&idt;
+
     memset(&idt, 0, sizeof(idt_entry_t) * 256);
-    idt_set_gate(14, (uint64_t)(uintptr_t)isr14, 0x08, 0x8E);
-    idt_set_gate(32, (uint64_t)(uintptr_t)isr0, 0x08, 0x8E);
-    idt_set_gate(33, (uint64_t)(uintptr_t)isr1, 0x08, 0x8E);
+
+    idt_set_gate(14, (uint64_t)(uintptr_t)isr14, 0x08, 0x8E); // Page fault handler
+    idt_set_gate(32, (uint64_t)(uintptr_t)isr0, 0x08, 0x8E); //Timer
+    idt_set_gate(33, (uint64_t)(uintptr_t)isr1, 0x08, 0x8E); // keyboard
+
+    idt_set_gate(46, (uint64_t)(uintptr_t)isr46, 0x08, 0x8E); // Primary Hard Disk
     idt_flush(&idt_p);
 }

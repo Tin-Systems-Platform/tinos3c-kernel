@@ -1,4 +1,4 @@
-#include <drivers/keyboard/kb.h>
+#include <hal/keyboard/kb.h>
 #include <lib/std/stdio.h>
 #include <lib/std/stdint.h>
 

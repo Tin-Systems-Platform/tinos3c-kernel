@@ -8,13 +8,42 @@
 static union {
     Block alignment;
     unsigned char bytes[POOL_SIZE];
-} memory_pool;
+} memory_pool __attribute__((aligned(16)));
 
 static Block *free_list;
 static int allocator_initialized;
 
-#define ALLOCATION_ALIGNMENT ((size_t)sizeof(size_t))
+#define ALLOCATION_ALIGNMENT ((size_t)16U)
 #define SIZE_MAX ((size_t)-1)
+
+/**
+ * Find an allocation header by checking the allocator's own block list.
+ *
+ * This prevents free and realloc from dereferencing arbitrary caller pointers.
+ *
+ * @param pointer Payload address to validate.
+ * @return Matching block header, or NULL when pointer is not a live pool block.
+ * @copyright See LICENSE.md.
+ * @date 2026-11-25
+ */
+static Block *find_allocated_block(void *pointer)
+{
+    Block *block;
+    uintptr_t address = (uintptr_t)pointer;
+    uintptr_t pool_start = (uintptr_t)memory_pool.bytes;
+    uintptr_t pool_end = pool_start + POOL_SIZE;
+
+    if (pointer == NULL || !allocator_initialized ||
+        address < pool_start + sizeof(Block) || address >= pool_end ||
+        (address & (ALLOCATION_ALIGNMENT - 1U)) != 0)
+        return NULL;
+
+    for (block = free_list; block != NULL; block = block->next) {
+        if ((uintptr_t)(block + 1) == address && !block->free)
+            return block;
+    }
+    return NULL;
+}
 
 static size_t align_size(size_t size) {
     size_t padding = ALLOCATION_ALIGNMENT - 1U;
@@ -42,7 +71,8 @@ static void split_block(Block *block, size_t size) {
     Block *remainder;
 
     /* Keep a header and at least one aligned allocation unit in the tail. */
-    if (block->size < size + sizeof(Block) + ALLOCATION_ALIGNMENT) {
+    if (block->size < size ||
+        block->size - size < sizeof(Block) + ALLOCATION_ALIGNMENT) {
         return;
     }
 
@@ -102,15 +132,8 @@ void *malloc(size_t size) {
  * No longer sweeps the entire list to find a matching pointer.
  */
 void free(void *ptr) {
-    if (ptr == NULL || !allocator_initialized) {
-        return;
-    }
-
-    // Direct header calculation from the payload pointer
-    Block *block = (Block *)ptr - 1;
-
-    // Safety guard against dangerous double-frees
-    if (block->free) {
+    Block *block = find_allocated_block(ptr);
+    if (block == NULL) {
         return; 
     }
 
@@ -143,9 +166,8 @@ void *realloc(void *ptr, size_t new_size) {
         return NULL;
     }
 
-    // Fixed to use O(1) header resolution
-    block = (Block *)ptr - 1;
-    if (block->free) {
+    block = find_allocated_block(ptr);
+    if (block == NULL) {
         return NULL;
     }
 

@@ -1,0 +1,60 @@
+#ifndef AHCI_H
+#define AHCI_H
+
+#include <lib/std/stdint.h>
+#include <lib/std/stdio.h>
+#include <hal/blkdev/blkdev.h>
+
+
+typedef struct {
+    uint32_t clb;
+    uint32_t clbu;
+    uint32_t fb;
+    uint32_t fbu;
+    uint32_t is;
+    uint32_t ie;
+    uint32_t cmd;
+    uint32_t reserved0;
+    uint32_t tfd;
+    uint32_t sig;
+    uint32_t ssts;
+    uint32_t sctl;
+    uint32_t serr;
+    uint32_t sact;
+    uint32_t ci;
+} __attribute__((packed)) ahci_port_t;
+
+typedef struct {
+    uint32_t options;
+    uint32_t prdbc;
+    uint32_t ctba;
+    uint32_t ctbau;
+    uint32_t reserved[4];
+} __attribute__((packed)) ahci_command_header_t;
+
+typedef struct {
+    uint8_t command_fis[64];
+    uint8_t atapi_command[16];
+    uint8_t reserved2[48];
+    struct { uint32_t dba, dbau, reserved, dbc; } __attribute__((packed)) prdt[1];
+} __attribute__((packed)) ahci_command_table_t;
+
+typedef struct {
+    uint32_t cap;
+    uint32_t ghc;
+    uint32_t is;
+    uint32_t pi;
+    uint32_t vs;
+    uint8_t  reserved[0x8C];
+    uint8_t  vendor[0x60];
+
+    ahci_port_t ports[32];
+} __attribute__((packed)) ahci_hba_mem_t;
+
+/**
+ * Discover AHCI controllers after PCI enumeration.
+ * @date 2026-10-10
+ */
+void ahci_init(void);
+
+#endif

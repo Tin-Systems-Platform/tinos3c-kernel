@@ -70,11 +70,18 @@ void pmm_add_region(uint64_t base, uint64_t length)
     uint64_t end;
     uint64_t pages_before = free_pages;
 
+    if (length == 0 || base >= MAX_PHYSICAL_MEMORY)
+        return;
+
+    /* Saturate before adding, then clamp to the bitmap's physical limit. */
+    end = length > MAX_PHYSICAL_MEMORY - base
+        ? MAX_PHYSICAL_MEMORY : base + length;
+    if (base > ~0ULL - (PMM_PAGE_SIZE - 1))
+        return;
+
     start = (base + PMM_PAGE_SIZE - 1)
           & ~(PMM_PAGE_SIZE - 1);
-
-    end = (base + length)
-        & ~(PMM_PAGE_SIZE - 1);
+    end &= ~(PMM_PAGE_SIZE - 1);
 
     if (end <= start) {
         printf("[PMM] Skipping region (end <= start)\n");
@@ -115,10 +122,17 @@ void pmm_reserve_region(uint64_t base, uint64_t length)
     uint64_t start;
     uint64_t end;
 
-    start = base & ~(PMM_PAGE_SIZE - 1);
+    if (length == 0 || base >= MAX_PHYSICAL_MEMORY)
+        return;
 
-    end = (base + length + PMM_PAGE_SIZE - 1)
-        & ~(PMM_PAGE_SIZE - 1);
+    end = length > MAX_PHYSICAL_MEMORY - base
+        ? MAX_PHYSICAL_MEMORY : base + length;
+
+    start = base & ~(PMM_PAGE_SIZE - 1);
+    if (end > MAX_PHYSICAL_MEMORY - (PMM_PAGE_SIZE - 1))
+        end = MAX_PHYSICAL_MEMORY;
+    else
+        end = (end + PMM_PAGE_SIZE - 1) & ~(PMM_PAGE_SIZE - 1);
 
     if (end <= start)
         return;
@@ -168,6 +182,83 @@ uint64_t pmm_alloc_page(void)
     return 0;
 }
 
+/**
+ * Allocate a physically contiguous range of pages below a limit.
+ *
+ * @param page_count Number of pages to allocate.
+ * @param max_address Exclusive upper physical-address limit.
+ * @return Physical base address, or zero when no suitable range exists.
+ * @date 2026-11-10
+ */
+uint64_t pmm_alloc_contiguous(uint64_t page_count, uint64_t max_address)
+{
+    uint64_t limit_page;
+    uint64_t run_start = 0;
+    uint64_t run_length = 0;
+
+    if (page_count == 0 || page_count > MAX_PAGES ||
+        max_address <= PMM_PAGE_SIZE)
+        return 0;
+
+    if (max_address > ~0ULL - (PMM_PAGE_SIZE - 1))
+        limit_page = MAX_PAGES;
+    else
+        limit_page = (max_address + PMM_PAGE_SIZE - 1) / PMM_PAGE_SIZE;
+    if (limit_page > MAX_PAGES)
+        limit_page = MAX_PAGES;
+
+    for (uint64_t page = 1; page < limit_page; ++page) {
+        if (page_used(page)) {
+            run_length = 0;
+            continue;
+        }
+
+        if (run_length == 0)
+            run_start = page;
+        ++run_length;
+        if (run_length < page_count)
+            continue;
+
+        for (uint64_t allocated = 0; allocated < page_count; ++allocated)
+            set_page(run_start + allocated);
+        free_pages -= page_count;
+        return run_start * PMM_PAGE_SIZE;
+    }
+
+    return 0;
+}
+
+/**
+ * Free a physically contiguous range of pages.
+ *
+ * The range is released only when every page is valid and currently used, so
+ * a malformed or double-free request cannot partially alter PMM state.
+ *
+ * @param address Page-aligned physical base address.
+ * @param page_count Number of pages in the range.
+ * @date 2026-11-10
+ */
+void pmm_free_contiguous(uint64_t address, uint64_t page_count)
+{
+    uint64_t first_page;
+
+    if (page_count == 0 || address % PMM_PAGE_SIZE != 0)
+        return;
+
+    first_page = address / PMM_PAGE_SIZE;
+    if (first_page == 0 || first_page >= MAX_PAGES ||
+        page_count > MAX_PAGES - first_page)
+        return;
+
+    for (uint64_t page = 0; page < page_count; ++page) {
+        if (!page_used(first_page + page))
+            return;
+    }
+
+    for (uint64_t page = 0; page < page_count; ++page)
+        clear_page(first_page + page);
+    free_pages += page_count;
+}
 
 /*
  * Free a physical page.

@@ -7,12 +7,14 @@
 #include <uacpi/event.h>
 
 //SUBSYSTEM INCLUDES
-#include <gdt/gdt.h>
-#include <idt/idt.h>
-#include <pic/pic.h>
-#include <mm/pmm.h>
-#include <mm/vmm.h>
-#include <drivers/pci/pci.h>
+#include <core/gdt/gdt.h>
+#include <core/idt/idt.h>
+#include <core/pic/pic.h>
+#include <core/mm/pmm.h>
+#include <core/mm/vmm.h>
+#include <hal/pci/pci.h>
+#include <hal/ahci/ahci.h>
+#include <hal/blkdev/blkdev.h>
 
 
 //INTERNAL SYSLIB INCLUDES
@@ -77,21 +79,40 @@ void _main(struct multiboot_info_t *mboot_info, uint32_t mboot_magic) {
     asm volatile("sti"); // Enable interrupts after PIC remapping
 
     uint64_t total_memory = 0;
+
+    if (mboot_info == 0 || mboot_magic != MULTIBOOT_BOOTLOADER_MAGIC)
+        panic("Invalid multiboot handoff", "BAD_MULTIBOOT_HEADER");
     
     pmm_init();
 
-	uint8_t* mmap_start =
-        (uint8_t*)(uintptr_t)mboot_info->mmap_addr;
+	uint8_t *mmap_cursor;
+    uint32_t mmap_remaining;
 
-    uint8_t* mmap_end =
-        mmap_start + mboot_info->mmap_length;
+    if ((mboot_info->flags & (1U << 6)) == 0 ||
+        mboot_info->mmap_length == 0)
+        panic("Multiboot memory map is missing", "NO_MEMORY_MAP");
 
-    mmap_entry_t* entry = (mmap_entry_t*)mmap_start;
+    mmap_cursor = (uint8_t *)(uintptr_t)mboot_info->mmap_addr;
+    mmap_remaining = mboot_info->mmap_length;
 
     printf("[BOOT] Memory map entries:\n");
 
-    while ((uint8_t*)entry < mmap_end)
+    while (mmap_remaining != 0)
     {
+        mmap_entry_t *entry;
+        uint32_t entry_bytes;
+
+        /* The size field excludes itself; require the standard 20-byte body. */
+        if (mmap_remaining < sizeof(entry->size))
+            panic("Truncated multiboot memory map", "BAD_MEMORY_MAP");
+
+        entry = (mmap_entry_t *)mmap_cursor;
+        if (entry->size < 20 || entry->size > UINT32_MAX - sizeof(entry->size))
+            panic("Invalid multiboot memory map entry", "BAD_MEMORY_MAP");
+        entry_bytes = entry->size + sizeof(entry->size);
+        if (entry_bytes > mmap_remaining)
+            panic("Truncated multiboot memory map entry", "BAD_MEMORY_MAP");
+
         uint32_t type = entry->type;
         if (type == MULTIBOOT_MEMORY_AVAILABLE)
         {
@@ -116,9 +137,8 @@ void _main(struct multiboot_info_t *mboot_info, uint32_t mboot_magic) {
             pmm_add_region(base, length);
         }
 
-        entry = (mmap_entry_t*)((uint8_t*)entry +
-                                entry->size +
-                                sizeof(entry->size));
+        mmap_cursor += entry_bytes;
+        mmap_remaining -= entry_bytes;
     }
 
     /*
@@ -143,8 +163,12 @@ void _main(struct multiboot_info_t *mboot_info, uint32_t mboot_magic) {
 
     pci_init();
 
+    blkdev_init();
+
+    ahci_init();
+    blkdev_scan_partitions();
     //printf("Usable memory: %u MiB\n", total_memory / (1024 * 1024));
 
     console();
-    panic("Kernel has panic due to something going wrong internally", "DEBUG_CONSOLE_EXITED");
+    panic("Kernel has paniced due to something going wrong internally", "DEBUG_CONSOLE_EXITED");
 }
