@@ -8,7 +8,9 @@
 #define PAGE_ADDRESS_MASK         0x000FFFFFFFFFF000ULL
 #define PAGE_FLAG_PRESENT         0x001ULL
 #define PAGE_FLAG_WRITABLE        0x002ULL
+#define PAGE_FLAG_LARGE           0x080ULL
 #define PAGE_FLAG_MASK            0xFFFULL
+#define LARGE_PAGE_ADDRESS_MASK   0x000FFFFFFFE00000ULL
 #define BOOTSTRAP_IDENTITY_LIMIT  (1024ULL * 1024ULL * 1024ULL)
 
 /* Accessed through the bootstrap identity map until a physical direct map exists. */
@@ -17,8 +19,6 @@ static uint64_t initial_pml4[PAGE_ENTRIES]
 static uint64_t initial_pdpt[PAGE_ENTRIES]
     __attribute__((aligned(PAGE_SIZE), section(".data.boot")));
 static uint64_t initial_pd[PAGE_ENTRIES]
-    __attribute__((aligned(PAGE_SIZE), section(".data.boot")));
-static uint64_t initial_pt[128][PAGE_ENTRIES]
     __attribute__((aligned(PAGE_SIZE), section(".data.boot")));
 static int paging_enabled __attribute__((section(".data.boot")));
 
@@ -29,8 +29,8 @@ static int page_aligned_address(uint64_t address)
 
 static int canonical_address(uint64_t address)
 {
-    uint64_t upper = address >> 48;
-    return upper == 0 || upper == 0xFFFFULL;
+    uint64_t upper = address >> 47;
+    return upper == 0 || upper == 0x1FFFFULL;
 }
 
 static void zero_page(uint64_t *page)
@@ -88,6 +88,37 @@ static uint64_t *next_table(uint64_t *table, uint16_t index)
         return 0;
     table[index] = table_entry((uint64_t)(uintptr_t)next);
     return next;
+}
+
+/**
+ * Replace a 2 MiB directory mapping with an equivalent 4 KiB page table.
+ *
+ * @param directory Directory containing the large-page entry.
+ * @param index Entry index to split.
+ * @return Page table on success, or NULL if memory cannot be allocated.
+ * @copyright See LICENSE.md.
+ * @date 2026-11-25
+ */
+static uint64_t *split_large_page(uint64_t *directory, uint16_t index)
+{
+    uint64_t entry = directory[index];
+    uint64_t physical_base;
+    uint64_t flags;
+    uint64_t *table;
+
+    if ((entry & (PAGE_FLAG_PRESENT | PAGE_FLAG_LARGE)) !=
+        (PAGE_FLAG_PRESENT | PAGE_FLAG_LARGE))
+        return entry_table(entry);
+
+    table = allocate_table();
+    if (table == 0)
+        return 0;
+    physical_base = entry & LARGE_PAGE_ADDRESS_MASK;
+    flags = (entry & PAGE_FLAG_MASK) & ~PAGE_FLAG_LARGE;
+    for (uint16_t page = 0; page < PAGE_ENTRIES; ++page)
+        table[page] = (physical_base + (uint64_t)page * PAGE_SIZE) | flags;
+    directory[index] = table_entry((uint64_t)(uintptr_t)table);
+    return table;
 }
 
 static void flush_tlb_page(uint64_t virtual_address)
@@ -164,7 +195,9 @@ void map_page(uint64_t virtual_address, uint64_t physical_address,
     pt_index = (uint16_t)((virtual_address >> 12) & 0x1FFULL);
     pdpt = next_table(initial_pml4, pml4_index);
     pd = pdpt == 0 ? 0 : next_table(pdpt, pdpt_index);
-    pt = pd == 0 ? 0 : next_table(pd, pd_index);
+    pt = pd == 0 ? 0 : split_large_page(pd, pd_index);
+    if (pt == 0 && pd != 0 && (pd[pd_index] & PAGE_FLAG_PRESENT) == 0)
+        pt = next_table(pd, pd_index);
     if (pt == 0)
         return;
 
@@ -192,7 +225,7 @@ void unmap_page(uint64_t virtual_address)
     pt_index = (uint16_t)((virtual_address >> 12) & 0x1FFULL);
     pdpt = entry_table(initial_pml4[pml4_index]);
     pd = pdpt == 0 ? 0 : entry_table(pdpt[pdpt_index]);
-    pt = pd == 0 ? 0 : entry_table(pd[pd_index]);
+    pt = pd == 0 ? 0 : split_large_page(pd, pd_index);
     if (pt == 0)
         return;
     pt[pt_index] = 0;
@@ -214,7 +247,9 @@ uint64_t *get_page_table(uint64_t virtual_address)
     pd_index = (uint16_t)((virtual_address >> 21) & 0x1FFULL);
     pdpt = entry_table(initial_pml4[pml4_index]);
     pd = pdpt == 0 ? 0 : entry_table(pdpt[pdpt_index]);
-    return pd == 0 ? 0 : entry_table(pd[pd_index]);
+    if (pd == 0 || (pd[pd_index] & PAGE_FLAG_LARGE) != 0)
+        return 0;
+    return entry_table(pd[pd_index]);
 }
 
 void get_all_pages(uint64_t *page_table, uint64_t *page_directory)

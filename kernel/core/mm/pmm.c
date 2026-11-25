@@ -70,11 +70,18 @@ void pmm_add_region(uint64_t base, uint64_t length)
     uint64_t end;
     uint64_t pages_before = free_pages;
 
+    if (length == 0 || base >= MAX_PHYSICAL_MEMORY)
+        return;
+
+    /* Saturate before adding, then clamp to the bitmap's physical limit. */
+    end = length > MAX_PHYSICAL_MEMORY - base
+        ? MAX_PHYSICAL_MEMORY : base + length;
+    if (base > ~0ULL - (PMM_PAGE_SIZE - 1))
+        return;
+
     start = (base + PMM_PAGE_SIZE - 1)
           & ~(PMM_PAGE_SIZE - 1);
-
-    end = (base + length)
-        & ~(PMM_PAGE_SIZE - 1);
+    end &= ~(PMM_PAGE_SIZE - 1);
 
     if (end <= start) {
         printf("[PMM] Skipping region (end <= start)\n");
@@ -115,10 +122,17 @@ void pmm_reserve_region(uint64_t base, uint64_t length)
     uint64_t start;
     uint64_t end;
 
-    start = base & ~(PMM_PAGE_SIZE - 1);
+    if (length == 0 || base >= MAX_PHYSICAL_MEMORY)
+        return;
 
-    end = (base + length + PMM_PAGE_SIZE - 1)
-        & ~(PMM_PAGE_SIZE - 1);
+    end = length > MAX_PHYSICAL_MEMORY - base
+        ? MAX_PHYSICAL_MEMORY : base + length;
+
+    start = base & ~(PMM_PAGE_SIZE - 1);
+    if (end > MAX_PHYSICAL_MEMORY - (PMM_PAGE_SIZE - 1))
+        end = MAX_PHYSICAL_MEMORY;
+    else
+        end = (end + PMM_PAGE_SIZE - 1) & ~(PMM_PAGE_SIZE - 1);
 
     if (end <= start)
         return;

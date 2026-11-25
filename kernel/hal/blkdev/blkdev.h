@@ -10,6 +10,8 @@ void enable_interupts_blockdev(void);
 
 
 // Structs
+struct block_device;
+
 struct block_device_ops {
     int (*read_sector)(struct block_device *bdev, uint64_t lba, void *buf);
     int (*write_sector)(struct block_device *bdev, uint64_t lba, void *buf);
