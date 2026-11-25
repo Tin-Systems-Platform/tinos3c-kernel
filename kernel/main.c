@@ -166,6 +166,7 @@ void _main(struct multiboot_info_t *mboot_info, uint32_t mboot_magic) {
     blkdev_init();
 
     ahci_init();
+    blkdev_scan_partitions();
     //printf("Usable memory: %u MiB\n", total_memory / (1024 * 1024));
 
     console();

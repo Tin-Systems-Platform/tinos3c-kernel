@@ -6,6 +6,11 @@
 
 //Function declarations
 void blkdev_init(void);
+/** Scan registered whole disks and register partitions described by MBR or GPT.
+ * @return Number of discovered partitions, or a negative value on invalid setup.
+ * @copyright See LICENSE.md.
+ * @date 2026-11-25 */
+int blkdev_scan_partitions(void);
 void enable_interupts_blockdev(void);
 
 
