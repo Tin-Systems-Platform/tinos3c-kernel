@@ -3,6 +3,7 @@
 
 #include <lib/std/stdint.h>
 #include <lib/std/stdio.h>
+#include <hal/blkdev/blkdev.h>
 
 
 typedef struct {
@@ -30,6 +31,13 @@ typedef struct {
     uint32_t ctbau;
     uint32_t reserved[4];
 } __attribute__((packed)) ahci_command_header_t;
+
+typedef struct {
+    uint8_t command_fis[64];
+    uint8_t atapi_command[16];
+    uint8_t reserved2[48];
+    struct { uint32_t dba, dbau, reserved, dbc; } __attribute__((packed)) prdt[1];
+} __attribute__((packed)) ahci_command_table_t;
 
 typedef struct {
     uint32_t cap;
